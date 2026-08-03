@@ -43,12 +43,25 @@ NEURAL_NEURONS: int = 10  # neurons
 LEARNING_GENERATIONS: int = 200  # generations
 POPULATION_SIZE: int = 16  # candidates
 MAX_SIMULATION_STEPS: int = 1000  # ticks
+MAP_REGIME_GENERATIONS: int = 25  # max generations per map before regenerating
+REGIME_MIN_GENERATIONS: int = 8  # minimum gens before mastery-based switch
+REGIME_SOLVE_TARGET: int = 1  # solvers required to switch map early
+REGIME_TRANSITION_MUTATION_BOOST: float = 1.0  # mutation scale on new maps
 MUTATION_RATE: float = 0.15  # ratio
 MUTATION_SCALE: float = 0.05  # scale
 ELITISM_RATIO: float = 0.20  # ratio
 DEFAULT_PLAYBACK_SPEED: int = 1  # multiplier
 DIST_TO_TIME_BONUS_RATIO: float = 1.0  # ratio
 LOST_HP_SCORE_IMPACT_RATIO: float = 0.5  # ratio
+
+# ------ Curriculum (Adaptive Difficulty) ------
+CURRICULUM_ENABLED: bool = True
+CURRICULUM_START_BFS: int = 8  # initial target path length (tiles)
+CURRICULUM_BFS_STEP: int = 2  # path length increase per solved regime
+CURRICULUM_BFS_WINDOW: int = 4  # acceptable path length range
+CURRICULUM_MAX_BFS: int = 20  # max targeted path length
+CURRICULUM_MAP_ATTEMPTS: int = 10  # map generation retries per regime
+CURRICULUM_FAILURES_BEFORE_EASE: int = 2  # unsolved regimes before easing
 
 # ------ GUI Element Layout Rectangles ------
 LAYOUT_GRID_RECT: Tuple[int, int, int, int] = (20, 20, 800, 600)  # rect
