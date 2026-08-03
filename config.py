@@ -43,7 +43,7 @@ NEURAL_NEURONS: int = 10  # neurons
 LEARNING_GENERATIONS: int = 200  # generations
 POPULATION_SIZE: int = 16  # candidates
 MAX_SIMULATION_STEPS: int = 1000  # ticks
-MAP_REGIME_GENERATIONS: int = 25  # max generations per map before regenerating
+MAP_REGIME_GENERATIONS: int = 1  # max generations per map before regenerating
 REGIME_MIN_GENERATIONS: int = 8  # minimum gens before mastery-based switch
 REGIME_SOLVE_TARGET: int = 1  # solvers required to switch map early
 REGIME_TRANSITION_MUTATION_BOOST: float = 1.0  # mutation scale on new maps
@@ -55,7 +55,7 @@ DIST_TO_TIME_BONUS_RATIO: float = 1.0  # ratio
 LOST_HP_SCORE_IMPACT_RATIO: float = 0.5  # ratio
 
 # ------ Curriculum (Adaptive Difficulty) ------
-CURRICULUM_ENABLED: bool = True
+CURRICULUM_ENABLED: bool = False
 CURRICULUM_START_BFS: int = 8  # initial target path length (tiles)
 CURRICULUM_BFS_STEP: int = 2  # path length increase per solved regime
 CURRICULUM_BFS_WINDOW: int = 4  # acceptable path length range
