@@ -178,6 +178,23 @@ Phase 7 [DONE] : Organic Branching Wall Generator, Pre-Rendered Tilemap Caching,
 Phase 8 [DONE] : Dual Kinematics Profiles (Car & Tank), Unit-Aligned Fitness 
                  Math, Health Penalty Weighting & Standardized 0-1000 Score Engine.
 
-===============================================================================
+[9.0 RUNNING THE SIMULATOR]
+-------------------------------------------------------------------------------
+Requirements : Python 3.14, NumPy, Pygame (2.6.1 tested).
+Launch       : venv/bin/python main.py    (from the project root)
+                 - Runs LEARNING_GENERATIONS generations headlessly, prints the
+                   per-generation CLI table, then boots the visualizer GUI.
+CLI Controls : Enter toggles camera mode; click to select candidates/frames;
+                 timeline scrubber handles play / repeat / turbo playback.
+
+Known Env Note : On some pygame 2.6.1 builds (pure-Python freetype font module)
+                 `pygame.font` fails to import with a circular-import error
+                 ("cannot import name 'Font'"). Fix: in
+                 venv/lib/python3.14/site-packages/pygame/font.py move the
+                 `from pygame.sysfont import ...` line below the `Font` class
+                 definition (it is then bound just before `get_init()`).
+                 Without this the GUI crashes at OverlayPanel init.
+
+================================================================================
 [!] PYVORENNDRO 2D | SOVEREIGN NEUROEVOLUTION ENGINE
 ===============================================================================
