@@ -47,23 +47,25 @@ Dual Map Styles: Selectable procedural level generation algorithms:
                    rooms without 2x2 solid wall blocks or dead pockets.
                  - "RANDOM": Classic random scattered wall noise layout.
 
-[3.0 SPATIAL PERCEPTION & STEREO COMPASS (11 INPUT CHANNELS)]
+[3.0 SPATIAL PERCEPTION (11 INPUT CHANNELS BY DEFAULT)]
 -------------------------------------------------------------------------------
-Vision Fan     : 7 probe rays distributed evenly across a 120-degree Field 
+Vision Fan     : 9 probe rays distributed evenly across a 120-degree Field 
                  of View (VISION_ARC_ANGLE). Rays measure wall proximity:
-                 - Channels 0..6 (-60° to +60°): 0.0 for open space up to 1.0 
+                 - Channels 0..8 (-60° to +60°): 0.0 for open space up to 1.0 
                    for a point-blank wall collision.
-Stereo Compass : 2 local cockpit directional sensors tracking goal angle:
-                 - Channel 7 (TG-L): Left eye target intensity [0.0, 1.0].
-                 - Channel 8 (TG-R): Right eye target intensity [0.0, 1.0].
 Proprioception : 2 physical status channels:
                  - Channel 9 (SPD): Current forward movement speed.
                  - Channel 10 (HP): Active candidate health ratio [0.0, 1.0].
+Optional       : INCLUDE_COMPASS adds 2 stereo target-compass channels (TG-L,
+Stereo Compass  TG-R) encoding the exit's bearing relative to heading,
+                 pushing the vector to 13 channels. Disabled by default so
+                 agents must learn maze structure from local wall rays alone
+                 (e.g. wall-following) instead of steering toward a beacon.
 
 [4.0 NEURAL NETWORK ARCHITECTURE (MLP ENGINE)]
 -------------------------------------------------------------------------------
-Inputs (Fixed) : 11 continuous sensory channels (7 Wall Rays + 2 Stereo 
-                 Compass Channels + Speed + Health Ratio).
+Inputs (Fixed) : 11 continuous sensory channels by default (9 Wall Rays + 
+                 Speed + Health Ratio), 13 when INCLUDE_COMPASS is enabled.
 Hidden Layers  : Configurable multi-layer dense stack (NEURAL_HIDDEN_LAYERS, 
                  NEURAL_NEURONS) using ReLU activations and Xavier weights.
 Outputs (Fixed): 2 continuous motor control channels:

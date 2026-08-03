@@ -8,6 +8,7 @@ from typing import Tuple, Optional
 import numpy as np
 from numpy.typing import NDArray
 
+import config
 from core.map_data import MapData
 from perception.vision_arc import VisionArcSampler
 
@@ -71,10 +72,15 @@ class SpatialTransformer:
             candidate_x, candidate_y, heading_rad, map_data.exit_pos
         )
 
-        state_features: NDArray[np.float32] = np.array(
-            [tg_left, tg_right, current_speed, health_ratio],
-            dtype=np.float32
-        )
+        if config.INCLUDE_COMPASS:
+            state_features: NDArray[np.float32] = np.array(
+                [tg_left, tg_right, current_speed, health_ratio],
+                dtype=np.float32
+            )
+        else:
+            state_features = np.array(
+                [current_speed, health_ratio], dtype=np.float32
+            )
 
         return np.concatenate([wall_channels, state_features])
 
@@ -102,9 +108,14 @@ class SpatialTransformer:
             xs, ys, headings, map_data.exit_pos
         )
 
-        state_features: NDArray[np.float32] = np.stack(
-            [tg_left, tg_right, speeds, healths], axis=1
-        ).astype(np.float32)
+        if config.INCLUDE_COMPASS:
+            state_features: NDArray[np.float32] = np.stack(
+                [tg_left, tg_right, speeds, healths], axis=1
+            ).astype(np.float32)
+        else:
+            state_features = np.stack(
+                [speeds, healths], axis=1
+            ).astype(np.float32)
 
         return np.concatenate([wall_channels, state_features], axis=1)
 

@@ -39,8 +39,13 @@ HEALTH_RECOVERY_RATIO: float = 0.5  # ratio
 NEURAL_HIDDEN_LAYERS: int = 2  # layers
 NEURAL_NEURONS: int = 10  # neurons
 
+# Stereo compass sensor: two channels encoding the exit's bearing relative
+# to heading. Disabling it forces agents to learn maze structure from local
+# wall rays alone (e.g. wall-following) instead of steering toward a beacon.
+INCLUDE_COMPASS: bool = False
+
 # ------ Genetic Algorithm & Training ------
-LEARNING_GENERATIONS: int = 200  # generations
+LEARNING_GENERATIONS: int = 400  # generations
 POPULATION_SIZE: int = 16  # candidates
 MAX_SIMULATION_STEPS: int = 1000  # ticks
 MAP_REGIME_GENERATIONS: int = 1  # max generations per map before regenerating

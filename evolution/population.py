@@ -19,7 +19,9 @@ class PopulationManager:
     def __init__(
         self,
         pop_size: int = config.POPULATION_SIZE,
-        input_size: int = config.VISION_RAYS + 4,
+        input_size: int = config.VISION_RAYS + (
+            2 if config.INCLUDE_COMPASS else 0
+        ) + 2,
         hidden_layers: int = config.NEURAL_HIDDEN_LAYERS,
         neurons: int = config.NEURAL_NEURONS,
         output_size: int = 2,
