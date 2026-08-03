@@ -8,6 +8,7 @@ generation cap is reached.
 """
 
 import time
+import random
 from typing import List, Dict, Any, Tuple
 
 import numpy as np
@@ -79,7 +80,7 @@ class HeadlessTrainer:
 
         for _ in range(config.CURRICULUM_MAP_ATTEMPTS):
             map_data: MapData = self.map_generator.generate_solvable_map(
-                difficulty_ratio=0.5
+                difficulty_ratio=config.CURRICULUM_DIFFICULTY_RATIO
             )
             pathfinder: BFSPathfinder = BFSPathfinder(map_data)
             pathfinder.compute_distance_matrix()
@@ -110,7 +111,15 @@ class HeadlessTrainer:
         if config.CURRICULUM_ENABLED:
             map_data = self._generate_map_for_target(target_bfs)
         else:
-            map_data = self.map_generator.generate_solvable_map()
+            if config.MAP_DIFFICULTY_MIN >= config.MAP_DIFFICULTY_MAX:
+                difficulty: float = config.MAP_DIFFICULTY_MIN
+            else:
+                difficulty = random.uniform(
+                    config.MAP_DIFFICULTY_MIN, config.MAP_DIFFICULTY_MAX
+                )
+            map_data = self.map_generator.generate_solvable_map(
+                difficulty_ratio=difficulty
+            )
 
         pathfinder: BFSPathfinder = BFSPathfinder(map_data)
         pathfinder.compute_distance_matrix()

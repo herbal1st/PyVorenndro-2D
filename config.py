@@ -47,8 +47,10 @@ MAP_REGIME_GENERATIONS: int = 1  # max generations per map before regenerating
 REGIME_MIN_GENERATIONS: int = 8  # minimum gens before mastery-based switch
 REGIME_SOLVE_TARGET: int = 1  # solvers required to switch map early
 REGIME_TRANSITION_MUTATION_BOOST: float = 1.0  # mutation scale on new maps
-MUTATION_RATE: float = 0.15  # ratio
-MUTATION_SCALE: float = 0.05  # scale
+MAP_DIFFICULTY_MIN: float = 0.55  # sampled training difficulty range (min)
+MAP_DIFFICULTY_MAX: float = 0.85  # sampled training difficulty range (max)
+MUTATION_RATE: float = 0.25  # ratio
+MUTATION_SCALE: float = 0.08  # scale
 ELITISM_RATIO: float = 0.20  # ratio
 DEFAULT_PLAYBACK_SPEED: int = 1  # multiplier
 DIST_TO_TIME_BONUS_RATIO: float = 1.0  # ratio
@@ -56,6 +58,7 @@ LOST_HP_SCORE_IMPACT_RATIO: float = 0.5  # ratio
 
 # ------ Curriculum (Adaptive Difficulty) ------
 CURRICULUM_ENABLED: bool = False
+CURRICULUM_DIFFICULTY_RATIO: float = 0.5  # map wall density used by curriculum
 CURRICULUM_START_BFS: int = 8  # initial target path length (tiles)
 CURRICULUM_BFS_STEP: int = 2  # path length increase per solved regime
 CURRICULUM_BFS_WINDOW: int = 4  # acceptable path length range
