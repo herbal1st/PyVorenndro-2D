@@ -1076,12 +1076,8 @@ def run_training_session(
         )
 
         solvers: List[Tuple[int, int]] = [
-            (
-                candidate_index,
-                state.frames_survived
-            )
-            for candidate_index, state
-            in enumerate(candidate_states)
+            (candidate_index, state.frames_survived)
+            for candidate_index, state in enumerate(candidate_states)
             if state.has_reached_exit
         ]
 
