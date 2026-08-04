@@ -1,14 +1,11 @@
 """
 Headless CPU neuroevolution trainer.
 
-The simulation hot path is fully batched across candidates:
+The simulation hot path is batched across the population:
 feature batch -> neural batch -> physics batch
 
-This avoids Python-level per-candidate simulation work while retaining the
-existing PlayerState, FitnessEvaluator, and FrameRecorder interfaces.
-
-The implementation is platform-independent and does not rely on multiprocessing,
-fork(), platform-specific SIMD libraries, or GPU availability.
+This avoids Python-level per-candidate simulation work while remaining
+portable across operating systems and CPU architectures.
 """
 
 import time
@@ -46,12 +43,12 @@ def __init__(
     grid_capacity: int = (
         config.GRID_ROWS * config.GRID_COLS
     )
-    clamped_pop: int = min(
+
+    self.pop_size: int = min(
         pop_size,
         grid_capacity
     )
 
-    self.pop_size: int = clamped_pop
     self.max_steps: int = max_steps
 
     self.map_generator: MapGenerator = MapGenerator()
@@ -59,12 +56,12 @@ def __init__(
     self.kinematics: CandidateKinematics = CandidateKinematics()
     self.recorder: FrameRecorder = FrameRecorder()
 
-    # Determine the network input size from the real feature compiler.
-    sample_map = (
+    # Determine the actual neural input width from the feature compiler.
+    sample_map: MapData = (
         self.map_generator.generate_solvable_map()
     )
 
-    sample_features = (
+    sample_features: np.ndarray = (
         self.transformer.compile_feature_vector(
             0.5,
             0.5,
@@ -75,18 +72,21 @@ def __init__(
         )
     )
 
-    self.input_size: int = len(sample_features)
+    self.input_size: int = int(
+        sample_features.shape[0]
+    )
+
     self.output_size: int = 2
 
     self.population: PopulationManager = (
         PopulationManager(
-            clamped_pop,
+            self.pop_size,
             input_size=self.input_size,
             output_size=self.output_size
         )
     )
 
-    # Cached map arrays.
+    # Cached map arrays. These remain unchanged throughout a map regime.
     self._wall_grid: np.ndarray = None
     self._dist_grid: np.ndarray = None
 
@@ -95,15 +95,15 @@ def _generate_map_for_target(
     target_bfs: int
 ) -> MapData:
     """
-    Generates a solvable map near the requested curriculum distance.
+    Generates a solvable map close to the requested curriculum target.
     """
-    lo: int = max(
+    minimum: int = max(
         2,
         target_bfs
     )
 
-    hi: int = (
-        lo
+    maximum: int = (
+        minimum
         + config.CURRICULUM_BFS_WINDOW
     )
 
@@ -127,19 +127,19 @@ def _generate_map_for_target(
 
         pathfinder.compute_distance_matrix()
 
-        start_dist: int = (
+        distance: int = (
             pathfinder.get_step_distance(
                 *map_data.start_pos
             )
         )
 
-        if lo <= start_dist <= hi:
+        if minimum <= distance <= maximum:
             return map_data
 
-        if start_dist < lo:
-            delta: int = lo - start_dist
+        if distance < minimum:
+            delta: int = minimum - distance
         else:
-            delta = start_dist - hi
+            delta = distance - maximum
 
         if delta < best_delta:
             best_delta = delta
@@ -155,28 +155,24 @@ def _generate_map_for_target(
 def _prepare_map(
     self,
     target_bfs: int
-) -> Tuple:
+) -> Tuple[
+    MapData,
+    BFSPathfinder,
+    int,
+    int,
+    float,
+    np.ndarray
+]:
     """
-    Prepares the active map and cached lookup grids.
-
-    Returns:
-        map_data,
-        pathfinder,
-        initial_bfs_dist,
-        num_turns,
-        theoretical_max,
-        spawn_headings
+    Generates/prepares the active map and its reusable lookup arrays.
     """
     if config.CURRICULUM_ENABLED:
-
-        map_data = (
+        map_data: MapData = (
             self._generate_map_for_target(
                 target_bfs
             )
         )
-
     else:
-
         if (
             config.MAP_DIFFICULTY_MIN
             >= config.MAP_DIFFICULTY_MAX
@@ -231,15 +227,14 @@ def _prepare_map(
         dtype=np.float64
     )
 
-    # These are reused for every timestep of every generation on
-    # this map. Rebuilding them inside the hot loop is expensive.
-    self._wall_grid = (
-        map_data.build_wall_grid()
+    self._wall_grid = np.asarray(
+        map_data.build_wall_grid(),
+        dtype=np.bool_
     )
 
     self._dist_grid = np.asarray(
         pathfinder.distance_matrix,
-        dtype=np.int64
+        dtype=np.int32
     )
 
     return (
@@ -251,37 +246,6 @@ def _prepare_map(
         spawn_headings
     )
 
-@staticmethod
-def _make_frame(
-    step: int,
-    x: float,
-    y: float,
-    heading: float,
-    face: str,
-    hit_wall: bool,
-    health: float,
-    is_alive: bool,
-    reached_exit: bool,
-    dist: int,
-    activations: List[List[float]]
-) -> Dict[str, Any]:
-    """
-    Constructs the existing recorder frame format.
-    """
-    return {
-        "step": step,
-        "x": x,
-        "y": y,
-        "heading": heading,
-        "face": face,
-        "hit_wall": hit_wall,
-        "health": health,
-        "is_alive": is_alive,
-        "reached_exit": reached_exit,
-        "dist": dist,
-        "activations": activations,
-    }
-
 def _simulate_generation(
     self,
     map_data: MapData,
@@ -292,35 +256,36 @@ def _simulate_generation(
     List[List[Dict[str, Any]]]
 ]:
     """
-    Runs one generation using batched sensory processing, neural
-    inference, and physics.
+    Simulates the complete population using batched operations.
 
-    The simulation state remains in NumPy arrays during the hot loop.
-    Python PlayerState objects and recorder dictionaries are created only
-    after simulation has completed.
+    The expensive operations are performed on NumPy arrays:
+        - vision
+        - neural inference
+        - movement
+        - collision
+        - health
+        - distance lookup
+
+    Python PlayerState objects and recorder dictionaries are only created
+    after the simulation has finished.
     """
-
     n: int = self.pop_size
 
     start_x, start_y = map_data.start_pos
     exit_x, exit_y = map_data.exit_pos
 
-    exit_x_center: float = (
-        float(exit_x) + 0.5
-    )
-    exit_y_center: float = (
-        float(exit_y) + 0.5
-    )
-
-    dist_grid: np.ndarray = self._dist_grid
     wall_grid: np.ndarray = self._wall_grid
+    dist_grid: np.ndarray = self._dist_grid
+
+    width: int = int(map_data.width)
+    height: int = int(map_data.height)
 
     move_speed: float = (
         self.kinematics.move_speed
     )
 
     # ------------------------------------------------------------------
-    # Persistent vectorized simulation state.
+    # Vectorized candidate state.
     # ------------------------------------------------------------------
 
     xs: np.ndarray = np.full(
@@ -335,10 +300,9 @@ def _simulate_generation(
         dtype=np.float64
     )
 
-    headings: np.ndarray = np.asarray(
-        spawn_headings,
-        dtype=np.float64
-    ).copy()
+    headings: np.ndarray = (
+        spawn_headings.copy()
+    )
 
     healths: np.ndarray = np.ones(
         n,
@@ -372,101 +336,96 @@ def _simulate_generation(
     )
 
     # ------------------------------------------------------------------
-    # Frame storage.
+    # Numeric frame history.
     #
-    # Numeric state is kept in compact NumPy arrays during simulation.
-    # This avoids constructing thousands of Python dictionaries in the
-    # hottest part of training.
+    # The visualizer requires the complete timeline, so we retain it,
+    # but keep the hot-loop representation compact and numeric.
     # ------------------------------------------------------------------
 
-    frame_x = np.empty(
+    frame_x: np.ndarray = np.empty(
         (self.max_steps, n),
         dtype=np.float64
     )
 
-    frame_y = np.empty_like(frame_x)
-    frame_heading = np.empty_like(frame_x)
-    frame_health = np.empty_like(frame_x)
+    frame_y: np.ndarray = np.empty_like(
+        frame_x
+    )
 
-    frame_dist = np.empty(
+    frame_heading: np.ndarray = np.empty_like(
+        frame_x
+    )
+
+    frame_health: np.ndarray = np.empty_like(
+        frame_x
+    )
+
+    frame_dist: np.ndarray = np.empty(
         (self.max_steps, n),
         dtype=np.int32
     )
 
-    frame_hit = np.empty(
+    frame_hit: np.ndarray = np.empty(
         (self.max_steps, n),
         dtype=np.bool_
     )
 
-    frame_alive = np.empty(
+    frame_alive: np.ndarray = np.empty(
         (self.max_steps, n),
         dtype=np.bool_
     )
 
-    frame_reached = np.empty(
+    frame_reached: np.ndarray = np.empty(
         (self.max_steps, n),
         dtype=np.bool_
     )
 
-    # Network activations are required by the visualizer.
+    # One activation history array per network layer.
     #
-    # The first activation is the input feature vector. Later entries
-    # are the dense-layer pre-activations returned by forward_batch().
+    # forward_batch() returns the input activation followed by each
+    # layer's pre-activation.
     activation_history: List[np.ndarray] = []
 
-    for layer_weights in self.population.weights:
+    for layer_index in range(
+        len(self.population.weights)
+    ):
+        if layer_index == 0:
+            width_activation: int = self.input_size
+        else:
+            width_activation = int(
+                self.population.weights[
+                    layer_index
+                ].shape[2]
+            )
+
         activation_history.append(
             np.empty(
                 (
                     self.max_steps,
                     n,
-                    layer_weights.shape[2]
-                    if layer_weights.ndim == 3
-                    else self.output_size
+                    width_activation
                 ),
                 dtype=np.float64
             )
         )
 
-    # The input activation has a different width, so allocate it after
-    # the actual feature compiler is known.
-    activation_history.insert(
-        0,
-        np.empty(
-            (
-                self.max_steps,
-                n,
-                self.input_size
-            ),
-            dtype=np.float64
-        )
-    )
-
     active: np.ndarray = alive.copy()
-
-    last_activations: List[np.ndarray] = [
-        np.zeros(
-            self.input_size,
-            dtype=np.float64
-        )
-    ]
-
-    for layer_weights in self.population.weights:
-        last_activations.append(
-            np.zeros(
-                layer_weights.shape[2],
-                dtype=np.float64
-            )
-        )
 
     steps_completed: int = 0
 
+    # Reusable constant speed vector.
+    speeds: np.ndarray = np.full(
+        n,
+        move_speed,
+        dtype=np.float64
+    )
+
     # ------------------------------------------------------------------
-    # Main simulation loop.
+    # Hot simulation loop.
     # ------------------------------------------------------------------
 
-    for step_idx in range(self.max_steps):
-
+    for step_index in range(
+        self.max_steps
+    ):
         if not bool(active.any()):
             break
 
@@ -475,7 +434,7 @@ def _simulate_generation(
         )
 
         # --------------------------------------------------------------
-        # 1. Batch sensory processing.
+        # Batch sensory processing.
         # --------------------------------------------------------------
 
         features: np.ndarray = (
@@ -483,11 +442,7 @@ def _simulate_generation(
                 xs[active_idx],
                 ys[active_idx],
                 headings[active_idx],
-                np.full(
-                    active_idx.shape,
-                    move_speed,
-                    dtype=np.float64
-                ),
+                speeds[active_idx],
                 healths[active_idx],
                 map_data,
                 wall_grid
@@ -495,7 +450,7 @@ def _simulate_generation(
         )
 
         # --------------------------------------------------------------
-        # 2. Batch neural inference.
+        # Batch neural inference.
         # --------------------------------------------------------------
 
         outputs, activations = (
@@ -505,24 +460,23 @@ def _simulate_generation(
             )
         )
 
-        # Store the activation arrays for active candidates.
         activation_history[0][
-            step_idx,
+            step_index,
             active_idx
-        ] = features
+        ] = activations[0]
 
-        for layer_idx, layer_activation in enumerate(
-            activations[1:],
-            start=1
+        for activation_index in range(
+            1,
+            len(activations)
         ):
-            activation_history[layer_idx][
-                step_idx,
+            activation_history[
+                activation_index
+            ][
+                step_index,
                 active_idx
-            ] = layer_activation
-
-        # --------------------------------------------------------------
-        # 3. Batch movement / collision physics.
-        # --------------------------------------------------------------
+            ] = activations[
+                activation_index
+            ]
 
         move_eff: np.ndarray = (
             outputs[:, 0]
@@ -532,23 +486,19 @@ def _simulate_generation(
             outputs[:, 1]
         )
 
-        old_xs: np.ndarray = (
-            xs[active_idx].copy()
-        )
-
-        old_ys: np.ndarray = (
-            ys[active_idx].copy()
-        )
+        # --------------------------------------------------------------
+        # Batch movement and collision.
+        # --------------------------------------------------------------
 
         (
-            new_xs,
-            new_ys,
-            new_headings,
+            new_x,
+            new_y,
+            new_heading,
             hit,
             stationary_turn
         ) = self.kinematics.step_batch(
-            old_xs,
-            old_ys,
+            xs[active_idx],
+            ys[active_idx],
             headings[active_idx],
             move_eff,
             turn_eff,
@@ -556,33 +506,39 @@ def _simulate_generation(
             wall_grid
         )
 
-        xs[active_idx] = new_xs
-        ys[active_idx] = new_ys
-        headings[active_idx] = new_headings
-
-        has_collided[active_idx] = hit
-
-        frames_survived[active_idx] += 1
-
-        # --------------------------------------------------------------
-        # 4. Batch health update.
-        # --------------------------------------------------------------
-
-        clamped_move: np.ndarray = np.clip(
-            move_eff,
-            0.0,
-            1.0
+        old_x: np.ndarray = (
+            xs[active_idx].copy()
         )
 
+        old_y: np.ndarray = (
+            ys[active_idx].copy()
+        )
+
+        xs[active_idx] = new_x
+        ys[active_idx] = new_y
+        headings[active_idx] = new_heading
+
+        has_collided[
+            active_idx
+        ] = hit
+
+        frames_survived[
+            active_idx
+        ] += 1
+
+        # --------------------------------------------------------------
+        # Batch health.
+        # --------------------------------------------------------------
+
         is_idle: np.ndarray = (
-            (clamped_move < 0.05)
+            (move_eff < 0.05)
             | (
                 (
-                    np.abs(new_xs - old_xs)
+                    np.abs(new_x - old_x)
                     < 1e-4
                 )
                 & (
-                    np.abs(new_ys - old_ys)
+                    np.abs(new_y - old_y)
                     < 1e-4
                 )
             )
@@ -603,51 +559,49 @@ def _simulate_generation(
             * config.HEALTH_IDLE_DMG_PER_FRAME
         )
 
-        active_health = np.maximum(
+        np.maximum(
             active_health,
-            0.0
+            0.0,
+            out=active_health
         )
 
-        healths[active_idx] = active_health
+        healths[
+            active_idx
+        ] = active_health
 
         died: np.ndarray = (
             active_health <= 0.0
         )
 
-        if bool(died.any()):
-            alive[
-                active_idx[died]
-            ] = False
-
         # --------------------------------------------------------------
-        # 5. Batch distance lookup.
+        # Batch grid coordinates.
         # --------------------------------------------------------------
 
         tile_x: np.ndarray = (
-            np.floor(new_xs).astype(np.int64)
+            np.floor(new_x).astype(np.int32)
         )
 
         tile_y: np.ndarray = (
-            np.floor(new_ys).astype(np.int64)
+            np.floor(new_y).astype(np.int32)
         )
 
         in_bounds: np.ndarray = (
             (tile_x >= 0)
-            & (tile_x < map_data.width)
+            & (tile_x < width)
             & (tile_y >= 0)
-            & (tile_y < map_data.height)
+            & (tile_y < height)
         )
 
         safe_x: np.ndarray = np.clip(
             tile_x,
             0,
-            map_data.width - 1
+            width - 1
         )
 
         safe_y: np.ndarray = np.clip(
             tile_y,
             0,
-            map_data.height - 1
+            height - 1
         )
 
         current_dist: np.ndarray = np.where(
@@ -659,6 +613,10 @@ def _simulate_generation(
             copy=False
         )
 
+        # --------------------------------------------------------------
+        # Batch distance improvement / health recovery.
+        # --------------------------------------------------------------
+
         previous_best: np.ndarray = (
             best_dist[active_idx]
         )
@@ -669,207 +627,181 @@ def _simulate_generation(
 
         if bool(improved.any()):
 
-            improved_amount: np.ndarray = (
+            improved_indices: np.ndarray = (
+                active_idx[improved]
+            )
+
+            improvement: np.ndarray = (
                 previous_best[improved]
                 - current_dist[improved]
             ).astype(
                 np.float64
             )
 
-            heal_amount: np.ndarray = (
-                improved_amount
+            recovery: np.ndarray = (
+                improvement
                 * config.HEALTH_COLL_DMG_PER_FRAME
                 * config.HEALTH_RECOVERY_RATIO
             )
 
-            improved_indices: np.ndarray = (
-                active_idx[improved]
-            )
-
-            healths[improved_indices] = np.minimum(
+            healths[
+                improved_indices
+            ] = np.minimum(
                 1.0,
-                healths[improved_indices]
-                + heal_amount
+                healths[
+                    improved_indices
+                ] + recovery
             )
 
-            best_dist[improved_indices] = (
-                current_dist[improved]
-            )
+            best_dist[
+                improved_indices
+            ] = current_dist[
+                improved
+            ]
 
         # --------------------------------------------------------------
-        # 6. Exit detection.
+        # Exit detection.
         # --------------------------------------------------------------
 
         reached_now: np.ndarray = (
-            (
-                np.floor(new_xs).astype(np.int64)
-                == exit_x
-            )
-            & (
-                np.floor(new_ys).astype(np.int64)
-                == exit_y
-            )
+            (tile_x == exit_x)
+            & (tile_y == exit_y)
         )
 
         if bool(reached_now.any()):
-            reached_exit[
+            reached_indices: np.ndarray = (
                 active_idx[reached_now]
+            )
+
+            reached_exit[
+                reached_indices
             ] = True
 
-        # Reached candidates stop simulating after this frame.
+        # Candidates reaching the exit or dying become inactive.
         if bool(reached_now.any()):
             active[
                 active_idx[reached_now]
             ] = False
 
-        # Dead candidates also stop after this frame.
         if bool(died.any()):
             active[
                 active_idx[died]
             ] = False
 
         # --------------------------------------------------------------
-        # 7. Store numeric frame state.
+        # Store numeric frame state.
         # --------------------------------------------------------------
 
         frame_x[
-            step_idx
+            step_index
         ] = xs
 
         frame_y[
-            step_idx
+            step_index
         ] = ys
 
         frame_heading[
-            step_idx
+            step_index
         ] = headings
 
         frame_health[
-            step_idx
+            step_index
         ] = healths
 
+        # Calculate distance for the complete population.
+        all_tile_x: np.ndarray = (
+            np.floor(xs).astype(np.int32)
+        )
+
+        all_tile_y: np.ndarray = (
+            np.floor(ys).astype(np.int32)
+        )
+
+        all_in_bounds: np.ndarray = (
+            (all_tile_x >= 0)
+            & (all_tile_x < width)
+            & (all_tile_y >= 0)
+            & (all_tile_y < height)
+        )
+
+        all_safe_x: np.ndarray = np.clip(
+            all_tile_x,
+            0,
+            width - 1
+        )
+
+        all_safe_y: np.ndarray = np.clip(
+            all_tile_y,
+            0,
+            height - 1
+        )
+
         frame_dist[
-            step_idx
+            step_index
         ] = np.where(
-            active,
-            np.where(
-                (
-                    np.floor(xs).astype(np.int64)
-                    >= 0
-                )
-                & (
-                    np.floor(xs).astype(np.int64)
-                    < map_data.width
-                )
-                & (
-                    np.floor(ys).astype(np.int64)
-                    >= 0
-                )
-                & (
-                    np.floor(ys).astype(np.int64)
-                    < map_data.height
-                ),
-                dist_grid[
-                    np.clip(
-                        np.floor(ys).astype(np.int64),
-                        0,
-                        map_data.height - 1
-                    ),
-                    np.clip(
-                        np.floor(xs).astype(np.int64),
-                        0,
-                        map_data.width - 1
-                    )
-                ],
-                9999
-            ),
-            np.where(
-                (
-                    np.floor(xs).astype(np.int64)
-                    >= 0
-                )
-                & (
-                    np.floor(xs).astype(np.int64)
-                    < map_data.width
-                )
-                & (
-                    np.floor(ys).astype(np.int64)
-                    >= 0
-                )
-                & (
-                    np.floor(ys).astype(np.int64)
-                    < map_data.height
-                ),
-                dist_grid[
-                    np.clip(
-                        np.floor(ys).astype(np.int64),
-                        0,
-                        map_data.height - 1
-                    ),
-                    np.clip(
-                        np.floor(xs).astype(np.int64),
-                        0,
-                        map_data.width - 1
-                    )
-                ],
-                9999
-            )
+            all_in_bounds,
+            dist_grid[
+                all_safe_y,
+                all_safe_x
+            ],
+            9999
         )
 
         frame_hit[
-            step_idx
+            step_index
         ] = has_collided
 
         frame_alive[
-            step_idx
+            step_index
         ] = alive
 
         frame_reached[
-            step_idx
+            step_index
         ] = reached_exit
 
-        steps_completed = step_idx + 1
+        steps_completed = (
+            step_index + 1
+        )
 
     # ------------------------------------------------------------------
-    # Convert final vectorized state into the existing PlayerState API.
-    # This happens once per candidate rather than once per timestep.
+    # Convert final vector state to PlayerState objects.
     # ------------------------------------------------------------------
 
     candidate_states: List[PlayerState] = []
 
-    for i in range(n):
+    for candidate_index in range(n):
 
-        state = PlayerState(
-            float(xs[i]),
-            float(ys[i])
+        state: PlayerState = PlayerState(
+            float(xs[candidate_index]),
+            float(ys[candidate_index])
         )
 
         state.heading = float(
-            headings[i]
+            headings[candidate_index]
         )
 
         state.health = float(
-            healths[i]
+            healths[candidate_index]
         )
 
         state.is_alive = bool(
-            alive[i]
+            alive[candidate_index]
         )
 
         state.has_reached_exit = bool(
-            reached_exit[i]
+            reached_exit[candidate_index]
         )
 
         state.has_collided = bool(
-            has_collided[i]
+            has_collided[candidate_index]
         )
 
         state.frames_survived = int(
-            frames_survived[i]
+            frames_survived[candidate_index]
         )
 
         state.best_step_dist = int(
-            best_dist[i]
+            best_dist[candidate_index]
         )
 
         candidate_states.append(
@@ -877,8 +809,7 @@ def _simulate_generation(
         )
 
     # ------------------------------------------------------------------
-    # Convert compact numeric history into the exact dictionary format
-    # expected by the visualizer/recorder.
+    # Convert compact history to the existing recorder format.
     # ------------------------------------------------------------------
 
     candidate_frames: List[
@@ -888,33 +819,37 @@ def _simulate_generation(
         for _ in range(n)
     ]
 
-    for i in range(n):
+    for candidate_index in range(n):
 
-        frames = candidate_frames[i]
+        frames: List[
+            Dict[str, Any]
+        ] = candidate_frames[
+            candidate_index
+        ]
 
-        for step_idx in range(
+        for step_index in range(
             steps_completed
         ):
 
             alive_value: bool = bool(
                 frame_alive[
-                    step_idx,
-                    i
+                    step_index,
+                    candidate_index
                 ]
             )
 
             reached_value: bool = bool(
                 frame_reached[
-                    step_idx,
-                    i
-                ]
+                    step_index,
+                    candidate_index
+                )
             )
 
             hit_value: bool = bool(
                 frame_hit[
-                    step_idx,
-                    i
-                ]
+                    step_index,
+                    candidate_index
+                )
             )
 
             face: str = (
@@ -925,56 +860,58 @@ def _simulate_generation(
                 )
             )
 
-            activations: List[List[float]] = [
-                activation_history[layer][
-                    step_idx,
-                    i
+            activations: List[
+                List[float]
+            ] = [
+                activation_history[
+                    layer_index
+                ][
+                    step_index,
+                    candidate_index
                 ].tolist()
-                for layer in range(
+                for layer_index in range(
                     len(activation_history)
                 )
             ]
 
-            frames.append(
-                self._make_frame(
-                    step_idx + 1,
-                    float(
-                        frame_x[
-                            step_idx,
-                            i
-                        ]
-                    ),
-                    float(
-                        frame_y[
-                            step_idx,
-                            i
-                        ]
-                    ),
-                    float(
-                        frame_heading[
-                            step_idx,
-                            i
-                        ]
-                    ),
-                    face,
-                    hit_value,
-                    float(
-                        frame_health[
-                            step_idx,
-                            i
-                        ]
-                    ),
-                    alive_value,
-                    reached_value,
-                    int(
-                        frame_dist[
-                            step_idx,
-                            i
-                        ]
-                    ),
-                    activations
-                )
-            )
+            frames.append({
+                "step": step_index + 1,
+                "x": float(
+                    frame_x[
+                        step_index,
+                        candidate_index
+                    ]
+                ),
+                "y": float(
+                    frame_y[
+                        step_index,
+                        candidate_index
+                    ]
+                ),
+                "heading": float(
+                    frame_heading[
+                        step_index,
+                        candidate_index
+                    ]
+                ),
+                "face": face,
+                "hit_wall": hit_value,
+                "health": float(
+                    frame_health[
+                        step_index,
+                        candidate_index
+                    ]
+                ),
+                "is_alive": alive_value,
+                "reached_exit": reached_value,
+                "dist": int(
+                    frame_dist[
+                        step_index,
+                        candidate_index
+                    ]
+                ),
+                "activations": activations
+            })
 
     return (
         candidate_states,
@@ -986,7 +923,7 @@ def run_training_session(
     num_generations: int = config.LEARNING_GENERATIONS
 ) -> FrameRecorder:
     """
-    Runs CPU candidate simulations over multiple generations.
+    Runs the complete headless training session.
     """
     print(
         "\n=== CPU NEUROEVOLUTION SIMULATION ==="
@@ -1022,18 +959,20 @@ def run_training_session(
     gens_on_map: int = 0
     consecutive_failures: int = 0
 
-    map_data = None
+    map_data: MapData = None
     initial_bfs_dist: int = 0
     theoretical_max: float = 0.0
     spawn_headings: np.ndarray = None
 
-    for gen_idx in range(
+    for gen_index in range(
         num_generations
     ):
 
-        gen_start: float = time.time()
+        generation_start: float = (
+            time.perf_counter()
+        )
 
-        new_map_this_gen: bool = (
+        new_map_this_generation: bool = (
             switch_next
         )
 
@@ -1083,7 +1022,7 @@ def run_training_session(
             for score in raw_scores
         ]
 
-        norm_scores: List[float] = (
+        normalized_scores: List[float] = (
             FitnessEvaluator.normalize_scores(
                 raw_scores
             )
@@ -1094,11 +1033,11 @@ def run_training_session(
         # --------------------------------------------------------------
 
         self.recorder.record_generation(
-            gen_idx,
+            gen_index,
             map_data,
             candidate_frames,
             scaled_scores,
-            norm_scores
+            normalized_scores
         )
 
         # --------------------------------------------------------------
@@ -1108,47 +1047,40 @@ def run_training_session(
         self.population.mutation_scale = (
             config.MUTATION_SCALE
             * config.REGIME_TRANSITION_MUTATION_BOOST
-            if new_map_this_gen
+            if new_map_this_generation
             else config.MUTATION_SCALE
         )
 
         self.population.evolve_next_generation(
-            norm_scores
+            normalized_scores
         )
 
         self.population.mutation_scale = (
             config.MUTATION_SCALE
         )
 
-        # --------------------------------------------------------------
-        # Statistics.
-        # --------------------------------------------------------------
-
-        gen_time: float = (
-            time.time() - gen_start
+        generation_time: float = (
+            time.perf_counter()
+            - generation_start
         )
 
-        top_int: int = int(
+        top_score: int = int(
             round(
                 max(scaled_scores)
             )
         )
 
-        avg_scaled: float = (
+        average_score: float = (
             sum(scaled_scores)
             / float(len(scaled_scores))
         )
 
-        winner_idx: int = int(
-            np.argmax(norm_scores)
-        )
-
         solvers: List[Tuple[int, int]] = [
             (
-                candidate_idx,
+                candidate_index,
                 state.frames_survived
             )
-            for candidate_idx, state
+            for candidate_index, state
             in enumerate(candidate_states)
             if state.has_reached_exit
         ]
@@ -1157,41 +1089,30 @@ def run_training_session(
             solvers
         )
 
-        exits_str: str = (
-            f"{solve_count}/{self.pop_size}"
-        )
-
         if solve_count > 0:
-
             fastest_step: int = min(
-                step_count
-                for _, step_count
-                in solvers
+                steps
+                for _, steps in solvers
             )
-
-            frame_str: str = str(
+            frame_string: str = str(
                 fastest_step
             )
-
         else:
+            frame_string = "-"
 
-            frame_str = "-"
-
-        row_str: str = (
-            f"{gen_idx + 1:>7d} | "
-            f"{top_int:>7d} | "
-            f"{avg_scaled:>7.1f} | "
+        print(
+            f"{gen_index + 1:>7d} | "
+            f"{top_score:>7d} | "
+            f"{average_score:>7.1f} | "
             f"{initial_bfs_dist:>7d} | "
             f"{target_bfs:>7d} | "
-            f"{frame_str:>7s} | "
-            f"{exits_str:>7s} | "
-            f"{gen_time:>5.2f}s"
+            f"{frame_string:>7s} | "
+            f"{solve_count}/{self.pop_size:>3d} | "
+            f"{generation_time:>5.2f}s"
         )
 
-        print(row_str)
-
         # --------------------------------------------------------------
-        # Curriculum.
+        # Curriculum / map regime.
         # --------------------------------------------------------------
 
         gens_on_map += 1
@@ -1251,9 +1172,7 @@ def run_training_session(
 
                     consecutive_failures = 0
 
-    print(
-        "-" * len(header_str)
-    )
+    print("-" * len(header_str))
 
     print(
         "CPU Training complete! "
