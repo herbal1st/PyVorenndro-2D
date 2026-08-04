@@ -28,8 +28,7 @@ class NetworkGraph:
     def draw_graph(
         self,
         surface: pygame.Surface,
-        gen_data: Dict[str, Any],
-        cand_idx: int,
+        run_data: Dict[str, Any],
         active_step: int
     ) -> None:
         """
@@ -43,7 +42,7 @@ class NetworkGraph:
             (self.x, self.y, self.w, self.h), 1
         )
 
-        frames: List[Dict[str, Any]] = gen_data["candidate_frames"][cand_idx]
+        frames: List[Dict[str, Any]] = run_data["frames"]
         if not frames:
             return
 

@@ -4,13 +4,11 @@ Global configuration settings for PyVorenndro 2D engine.
 
 from typing import Tuple
 
-# ------ Display & Grid Layout ------
+# ------ Display & Window Layout ------
 
 SCREEN_WIDTH: int = 1280  # pixels
 SCREEN_HEIGHT: int = 720  # pixels
 FPS: int = 60  # hertz
-GRID_ROWS: int = 4  # count
-GRID_COLS: int = 4  # count
 
 # ------ World & Map Parameters ------
 
@@ -42,20 +40,31 @@ HEALTH_RECOVERY_RATIO: float = 0.5  # ratio
 # ------ Neural Architecture ------
 
 NEURAL_HIDDEN_LAYERS: int = 2  # layers
-NEURAL_NEURONS: int = 10  # neurons
+NEURAL_NEURONS: int = 32  # neurons
 
 # Stereo compass sensor: two channels encoding the exit's bearing relative
-
-# to heading. Disabling it forces agents to learn maze structure from local
-
+# to heading. Enabling it lets the agent steer toward the exit from its own
+# position; disabling it forces agents to learn maze structure from local
 # wall rays alone (e.g. wall-following) instead of steering toward a beacon.
-
 INCLUDE_COMPASS: bool = False
+
+# Whether the agent receives the current tile's BFS distance to the exit
+# (normalized by the map's maximum path span). A goal-gradient sensor that
+# makes maze navigation substantially more learnable for the small MLP.
+INCLUDE_BFS_SENSOR: bool = False
 
 # ------ Genetic Algorithm & Training ------
 
-LEARNING_GENERATIONS: int = 400  # generations
-POPULATION_SIZE: int = 16  # candidates
+# Single-agent evolution: one champion genome is re-evaluated every generation
+# across SIMULATION_RUNS parallel, independently-seeded simulation runs. The
+# aggregated fitness across those runs is corroborated in the single agent.
+
+# The champion and its POPULATION_SIZE-1 mutated offspring share the SAME map
+# set each generation (fair, paired selection), so the total simulation budget
+# per generation is SIMULATION_RUNS (POPULATION_SIZE agents x shared maps).
+LEARNING_GENERATIONS: int = 100  # generations
+SIMULATION_RUNS: int = 100  # total parallel simulations per generation
+POPULATION_SIZE: int = 2  # candidate agents evaluated per generation (1 champion + offspring)
 MAX_SIMULATION_STEPS: int = 1000  # ticks
 MAP_REGIME_GENERATIONS: int = 1  # max generations per map before regenerating
 REGIME_MIN_GENERATIONS: int = 8  # minimum gens before mastery-based switch
@@ -64,11 +73,17 @@ REGIME_TRANSITION_MUTATION_BOOST: float = 1.0  # mutation scale on new maps
 MAP_DIFFICULTY_MIN: float = 0.55  # sampled training difficulty range (min)
 MAP_DIFFICULTY_MAX: float = 0.85  # sampled training difficulty range (max)
 MUTATION_RATE: float = 0.25  # ratio
-MUTATION_SCALE: float = 0.08  # scale
+MUTATION_SCALE: float = 0.12  # initial scale
+MUTATION_SCALE_MIN: float = 0.002  # adaptive floor
+MUTATION_SCALE_MAX: float = 0.5  # adaptive ceiling
+MUTATION_ADAPT_WINDOW: int = 8  # generations for the 1/5 success rule
+STAGNATION_BUMP_GENERATIONS: int = 8  # gens without accept before scale bump
+STAGNATION_BUMP_FACTOR: float = 4.0  # scale multiplier on stagnation
 ELITISM_RATIO: float = 0.20  # ratio
 DEFAULT_PLAYBACK_SPEED: int = 1  # multiplier
 DIST_TO_TIME_BONUS_RATIO: float = 1.0  # ratio
 LOST_HP_SCORE_IMPACT_RATIO: float = 0.5  # ratio
+RECORDER_MAX_GENERATIONS: int = 1000  # metric history cap
 
 # ------ Parallel Simulation ------
 
@@ -81,6 +96,34 @@ LOST_HP_SCORE_IMPACT_RATIO: float = 0.5  # ratio
 # Windows, Linux, and macOS.
 
 SIMULATION_WORKERS: int = 0
+
+# ------ GPU (PyTorch) Training Backend ------
+
+# "auto" picks the GPU backend when a CUDA device is available, otherwise it
+# falls back to the portable CPU backend. "gpu" forces GPU (errors if CUDA is
+# unavailable), "cpu" forces the CPU backend.
+
+TRAINING_BACKEND: str = "auto"
+
+# When the GPU backend is active these replace the CPU defaults so a single
+# champion generation runs thousands of parallel simulations on the device.
+
+SIMULATION_RUNS_GPU: int = 16384  # total parallel simulations per GPU generation
+POPULATION_SIZE_GPU: int = 16  # candidate agents evaluated per GPU generation
+
+# Hardware-aware auto-configuration. On startup the trainer measures the real
+# simulation throughput of this machine's backend (a short calibration run on
+# the actual device) and picks the per-generation run budget, population size,
+# and worker count so one generation lands near TARGET_GEN_TIME seconds while
+# staying within hardware limits (VRAM for GPU, core count for CPU). Set
+# AUTO_TUNE = False to force the static values above instead.
+
+AUTO_TUNE: bool = False
+TARGET_GEN_TIME: float = 0.75  # target seconds per training generation
+AUTO_TUNE_MIN_RUNS: int = 64  # never drop below this run budget
+AUTO_TUNE_MAX_RUNS: int = 32768  # never exceed this run budget
+AUTO_TUNE_PROBE_RUNS: int = 256  # calibration runs used on the GPU backend
+AUTO_TUNE_PROBE_RUNS_CPU: int = 32  # calibration runs used on the CPU backend
 
 # ------ Curriculum (Adaptive Difficulty) ------
 

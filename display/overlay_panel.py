@@ -1,5 +1,5 @@
 """
-Renders header title, telemetry dashboard, and active candidate information.
+Renders header title, telemetry dashboard, and live run information.
 """
 
 from typing import Tuple, Dict, Any, List
@@ -10,7 +10,7 @@ import config
 
 class OverlayPanel:
     """
-    Renders dashboard headers, active scores, and winner callouts in 2 columns.
+    Renders dashboard headers, active run stats, and trainer metrics in columns.
     """
 
     def __init__(
@@ -31,14 +31,12 @@ class OverlayPanel:
     def draw_panel(
         self,
         surface: pygame.Surface,
-        gen_data: Dict[str, Any],
-        active_cand_idx: int,
+        run_data: Dict[str, Any],
         active_step: int,
-        total_steps: int,
-        total_gens: int
+        metrics: Dict[str, Any]
     ) -> None:
         """
-        Renders title header and 2-column scaled dashboard metrics.
+        Renders title header and 2-column live telemetry metrics.
         """
         pygame.draw.rect(
             surface, config.COLOR_BG, (self.x, self.y, self.w, self.h)
@@ -49,18 +47,20 @@ class OverlayPanel:
         )
 
         # Title header in Light Blue
-        title_text: str = "PYVORENNDRO 2D - NEUROEVOLUTION"
+        title_text: str = "PYVORENNDRO 2D - LIVE AGENT"
         title_surf = self.title_font.render(
             title_text, True, config.COLOR_START
         )
         surface.blit(title_surf, (self.x + 12, self.y + 10))
 
-        gen_num: int = gen_data["generation"] + 1
-        raw_scores: List[float] = gen_data["raw_scores"]
-        top_score: float = max(raw_scores)
-        avg_score: float = sum(raw_scores) / float(len(raw_scores))
-        winner_idx: int = gen_data["winner_index"]
-        max_f: int = total_frames_limit(gen_data)
+        run_number: int = int(run_data.get("run_number", 0))
+        max_f: int = int(run_data.get("max_steps", config.MAX_SIMULATION_STEPS))
+        gen: int = int(metrics.get("generation", 0)) + 1
+        total_gens: int = int(metrics.get("num_generations", 1))
+        best_fitness: float = float(metrics.get("best_fitness", 0.0))
+        gen_fitness: float = float(metrics.get("gen_fitness", 0.0))
+        solve_count: int = int(metrics.get("solve_count", 0))
+        num_runs: int = int(metrics.get("num_runs", 1))
 
         # Column X coordinates and Row Y coordinates
         col1_x: int = self.x + 12
@@ -71,7 +71,7 @@ class OverlayPanel:
 
         # Left Column Metrics
         lbl_sel = self.body_font.render(
-            f"SELECTED : #{active_cand_idx}",
+            f"RUN       : #{run_number}",
             True,
             config.COLOR_PLAYER_HIGHLIGHT
         )
@@ -85,7 +85,7 @@ class OverlayPanel:
         surface.blit(lbl_step, (col1_x, row_y2))
 
         lbl_gen = self.body_font.render(
-            f"GENERATION: {gen_num}/{total_gens}",
+            f"GENERATION: {gen}/{total_gens}",
             True,
             (255, 255, 255)
         )
@@ -93,32 +93,22 @@ class OverlayPanel:
 
         # Right Column Metrics
         lbl_win = self.body_font.render(
-            f"WINNER   : #{winner_idx}",
+            f"WINNER   : #{gen if best_fitness > 0 else 0}",
             True,
             config.COLOR_EXIT
         )
         surface.blit(lbl_win, (col2_x, row_y1))
 
         lbl_top = self.body_font.render(
-            f"TOP SCORE : {top_score:.1f}",
+            f"TOP SCORE : {best_fitness:.1f}",
             True,
             config.COLOR_EXIT
         )
         surface.blit(lbl_top, (col2_x, row_y2))
 
         lbl_avg = self.body_font.render(
-            f"AVG SCORE : {avg_score:.1f}",
+            f"AVG SCORE : {gen_fitness:.1f}",
             True,
             (200, 200, 200)
         )
         surface.blit(lbl_avg, (col2_x, row_y3))
-
-
-def total_frames_limit(gen_data: Dict[str, Any]) -> int:
-    """
-    Returns max frames recorded across all candidates in a generation.
-    """
-    frames_list = gen_data["candidate_frames"]
-    if not frames_list:
-        return 0
-    return max(len(c_frames) for c_frames in frames_list)

@@ -147,17 +147,26 @@ class CandidateKinematics:
         headings: np.ndarray,
         move_effort: np.ndarray,
         turn_effort: np.ndarray,
-        map_data: MapData,
-        wall_grid: Optional[np.ndarray] = None
+        map_data: MapData = None,
+        wall_grid: Optional[np.ndarray] = None,
+        wall_grids: Optional[np.ndarray] = None
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         Vectorized tank rotation, forward step, and Circle-to-AABB resolution
         over (N,) states. Returns (x, y, heading, hit, is_stationary_turn).
         Iteration order matches the scalar path bit-for-bit.
+
+        ``wall_grids`` (N, H, W) lets every row collide against its own map,
+        enabling a single shared genome to steer many parallel runs at once.
         """
-        if wall_grid is None:
-            wall_grid = map_data.build_wall_grid()
-        h, w = wall_grid.shape
+        multi_grid: bool = wall_grids is not None
+        if multi_grid:
+            h, w = wall_grids.shape[1], wall_grids.shape[2]
+            runs: np.ndarray = np.arange(int(xs.shape[0]))
+        else:
+            if wall_grid is None:
+                wall_grid = map_data.build_wall_grid()
+            h, w = wall_grid.shape
         r: float = self.radius
         n: int = int(xs.shape[0])
 
@@ -194,7 +203,12 @@ class CandidateKinematics:
                     )
                     txc: np.ndarray = np.clip(tx, 0, w - 1)
                     tyc: np.ndarray = np.clip(ty, 0, h - 1)
-                    is_wall: np.ndarray = inb & wall_grid[tyc, txc]
+                    if multi_grid:
+                        is_wall: np.ndarray = inb & wall_grids[
+                            runs, tyc, txc
+                        ]
+                    else:
+                        is_wall = inb & wall_grid[tyc, txc]
                     if not bool(is_wall.any()):
                         continue
 

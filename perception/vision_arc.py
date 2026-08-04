@@ -65,20 +65,30 @@ class VisionArcSampler:
         xs: np.ndarray,
         ys: np.ndarray,
         headings: np.ndarray,
-        map_data: MapData,
-        wall_grid: np.ndarray = None
+        map_data: MapData = None,
+        wall_grid: np.ndarray = None,
+        wall_grids: np.ndarray = None
     ) -> NDArray[np.float32]:
         """
         Vectorized Amanatides-Woo DDA across (N,) origins and headings.
         Returns a (N, VISION_RAYS) float32 wall proximity array.
+
+        When ``wall_grids`` (shape (N, H, W)) is supplied, every origin row
+        casts against its own map grid; otherwise a single shared ``wall_grid``
+        is used for all rows (legacy single-map behaviour).
         """
         n_cands: int = int(xs.shape[0])
         if n_cands == 0:
             return np.zeros((0, self.num_rays), dtype=np.float32)
 
-        if wall_grid is None:
-            wall_grid = map_data.build_wall_grid()
-        h, w = wall_grid.shape
+        multi_grid: bool = wall_grids is not None
+
+        if multi_grid:
+            h, w = wall_grids.shape[1], wall_grids.shape[2]
+        else:
+            if wall_grid is None:
+                wall_grid = map_data.build_wall_grid()
+            h, w = wall_grid.shape
 
         offsets: np.ndarray = np.asarray(self.relative_angles, dtype=np.float64)
         angles: np.ndarray = headings[:, None] + offsets[None, :]
@@ -87,6 +97,11 @@ class VisionArcSampler:
 
         ox: np.ndarray = np.repeat(xs, self.num_rays)
         oy: np.ndarray = np.repeat(ys, self.num_rays)
+
+        # Per-ray origin row index, used to select the right map grid.
+        run_idx: np.ndarray = np.repeat(
+            np.arange(n_cands), self.num_rays
+        )
 
         tile_x: np.ndarray = np.floor(ox).astype(np.int64)
         tile_y: np.ndarray = np.floor(oy).astype(np.int64)
@@ -101,7 +116,11 @@ class VisionArcSampler:
         )
         txc: np.ndarray = np.clip(tile_x, 0, w - 1)
         tyc: np.ndarray = np.clip(tile_y, 0, h - 1)
-        inside_wall: np.ndarray = inb & wall_grid[tyc, txc]
+        if multi_grid:
+            is_wall_at: np.ndarray = wall_grids[run_idx, tyc, txc]
+        else:
+            is_wall_at = wall_grid[tyc, txc]
+        inside_wall: np.ndarray = inb & is_wall_at
         prox[inside_wall] = 1.0
         done[inside_wall] = True
 
@@ -151,7 +170,11 @@ class VisionArcSampler:
             )
             txc = np.clip(tile_x, 0, w - 1)
             tyc = np.clip(tile_y, 0, h - 1)
-            wall_hit: np.ndarray = inb & wall_grid[tyc, txc]
+            if multi_grid:
+                is_wall_at = wall_grids[run_idx, tyc, txc]
+            else:
+                is_wall_at = wall_grid[tyc, txc]
+            wall_hit: np.ndarray = inb & is_wall_at
             blocked: np.ndarray = active & ~no_hit & (wall_hit | ~inb)
             prox = np.where(
                 blocked,

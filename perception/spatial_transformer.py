@@ -57,10 +57,11 @@ class SpatialTransformer:
         heading_rad: float,
         current_speed: float,
         health_ratio: float,
-        map_data: MapData
+        map_data: MapData,
+        current_dist: Optional[float] = None
     ) -> NDArray[np.float32]:
         """
-        Samples wall rays and stereo target compass into 11 channels.
+        Samples wall rays and stereo target compass into flat channels.
         """
         wall_channels: NDArray[np.float32] = (
             self.sampler.sample_vision_channels(
@@ -82,6 +83,22 @@ class SpatialTransformer:
                 [current_speed, health_ratio], dtype=np.float32
             )
 
+        if config.INCLUDE_BFS_SENSOR:
+            max_span: float = float(map_data.height + map_data.width)
+            if current_dist is None:
+                dist_channel: NDArray[np.float32] = np.zeros(
+                    (1,), dtype=np.float32
+                )
+            else:
+                dist_channel = np.array(
+                    [max(0.0, min(1.0, float(current_dist) / max_span))],
+                    dtype=np.float32
+                )
+
+            state_features = np.concatenate(
+                [state_features, dist_channel]
+            )
+
         return np.concatenate([wall_channels, state_features])
 
     def compile_feature_batch(
@@ -91,22 +108,41 @@ class SpatialTransformer:
         headings: NDArray[np.float64],
         speeds: NDArray[np.float64],
         healths: NDArray[np.float64],
-        map_data: MapData,
-        wall_grid: Optional[np.ndarray] = None
+        map_data: MapData = None,
+        wall_grid: Optional[np.ndarray] = None,
+        wall_grids: Optional[np.ndarray] = None,
+        exit_positions: Optional[np.ndarray] = None,
+        current_dists: Optional[np.ndarray] = None
     ) -> NDArray[np.float32]:
         """
         Vectorized feature compiler for (N,) candidate states.
         Returns a (N, channels) float32 feature matrix.
+
+        ``wall_grids`` (N, H, W) gives every row its own map grid and
+        ``exit_positions`` (N, 2) its own target tile, enabling one shared
+        genome to drive many independently-seeded simulation runs at once.
+        ``current_dists`` (N,) optionally supplies each row's BFS distance to
+        the exit when the goal-gradient sensor is enabled.
         """
-        wall_channels: NDArray[np.float32] = (
-            self.sampler.sample_vision_channels_batch(
+        if wall_grids is not None:
+            wall_channels: NDArray[np.float32] = (
+                self.sampler.sample_vision_channels_batch(
+                    xs, ys, headings, map_data, wall_grids=wall_grids
+                )
+            )
+        else:
+            wall_channels = self.sampler.sample_vision_channels_batch(
                 xs, ys, headings, map_data, wall_grid
             )
-        )
 
-        tg_left, tg_right = self._compute_stereo_compass_batch(
-            xs, ys, headings, map_data.exit_pos
-        )
+        if exit_positions is not None:
+            tg_left, tg_right = self._compute_stereo_compass_batch(
+                xs, ys, headings, exit_positions
+            )
+        else:
+            tg_left, tg_right = self._compute_stereo_compass_batch(
+                xs, ys, headings, map_data.exit_pos
+            )
 
         if config.INCLUDE_COMPASS:
             state_features: NDArray[np.float32] = np.stack(
@@ -117,6 +153,26 @@ class SpatialTransformer:
                 [speeds, healths], axis=1
             ).astype(np.float32)
 
+        if config.INCLUDE_BFS_SENSOR:
+            if current_dists is not None:
+                dist_channel: NDArray[np.float32] = np.clip(
+                    np.asarray(
+                        current_dists, dtype=np.float64
+                    ) / float(
+                        wall_grids.shape[1] + wall_grids.shape[2]
+                    ),
+                    0.0,
+                    1.0
+                ).astype(np.float32).reshape(-1, 1)
+            else:
+                dist_channel = np.zeros(
+                    (len(xs), 1), dtype=np.float32
+                )
+
+            state_features = np.concatenate(
+                [state_features, dist_channel], axis=1
+            )
+
         return np.concatenate([wall_channels, state_features], axis=1)
 
     def _compute_stereo_compass_batch(
@@ -124,13 +180,25 @@ class SpatialTransformer:
         cxs: NDArray[np.float64],
         cys: NDArray[np.float64],
         headings: NDArray[np.float64],
-        exit_pos: Tuple[int, int]
+        exit_pos: object
     ) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
         """
         Vectorized stereo binocular target compass for (N,) headings.
+
+        ``exit_pos`` is either a single (x, y) tile (shared map) or an
+        (N, 2) array giving each row its own exit tile.
         """
-        ex: float = float(exit_pos[0]) + 0.5
-        ey: float = float(exit_pos[1]) + 0.5
+        if isinstance(exit_pos, tuple):
+            ex: NDArray[np.float64] = np.full_like(
+                cxs, float(exit_pos[0]) + 0.5
+            )
+            ey: NDArray[np.float64] = np.full_like(
+                cys, float(exit_pos[1]) + 0.5
+            )
+        else:
+            ep: np.ndarray = np.asarray(exit_pos, dtype=np.float64)
+            ex = ep[:, 0] + 0.5
+            ey = ep[:, 1] + 0.5
 
         dx: NDArray[np.float64] = ex - cxs
         dy: NDArray[np.float64] = ey - cys
