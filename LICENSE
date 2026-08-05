@@ -4,10 +4,10 @@ Copyright (c) 2026 herbal1st. All Rights Reserved.
 
 1. GRANT OF LICENSE
 Subject to the terms and conditions of this Agreement, the Copyright Holder
-hereby grants you a non-exclusive, non-transferable, royalty-free license 
-to view, download, modify, compile, and run and test the source code of 
-PyVorenndro 2D strictly for personal evaluation, educational purposes, and 
-non-commercial research.
+hereby grants you a non-exclusive, non-transferable, royalty-free license
+to view, download, compile, and run the source code of PyVorenndro 2D
+strictly for personal evaluation, educational purposes, and non-commercial
+research.
 
 2. RESTRICTIONS
 You may not:
@@ -33,10 +33,3 @@ COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY,
 WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF,
 OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-5. CONTRIBUTIONSBy submitting any modifications, bug fixes, suggestions, or
-contributions (including via Pull Requests) to the Copyright Holder or the
-repository, you agree to grant the Copyright Holder a perpetual, irrevocable,
-worldwide, royalty-free, transferable license to use, modify, distribute,
-and sub-license your contributions as part of the Software without
-restriction or compensation.

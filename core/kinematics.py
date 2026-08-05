@@ -3,7 +3,9 @@ Candidate movement physics and position LERP interpolation.
 """
 
 import math
-from typing import Tuple
+from typing import Tuple, Optional
+import numpy as np
+from numpy.typing import NDArray
 
 import config
 from core.map_data import MapData
@@ -137,6 +139,106 @@ class CandidateKinematics:
             next_x, next_y, map_data
         )
         return resolved_x, resolved_y, hit
+
+    def step_batch(
+        self,
+        xs: NDArray[np.float64],
+        ys: NDArray[np.float64],
+        headings: NDArray[np.float64],
+        move_effort: NDArray[np.float64],
+        turn_effort: NDArray[np.float64],
+        map_data: MapData,
+        wall_grid: Optional[NDArray[np.bool_]] = None
+    ) -> Tuple[
+        NDArray[np.float64],
+        NDArray[np.float64],
+        NDArray[np.float64],
+        NDArray[np.bool_],
+        NDArray[np.bool_]
+    ]:
+        """Vectorized rotation, forward step, and Circle-to-AABB resolution.
+
+        Returns (x, y, heading, hit, is_stationary_turn).
+        """
+        if wall_grid is None:
+            wall_grid = map_data.build_wall_grid()
+        h, w = wall_grid.shape
+        r: float = self.radius
+        n: int = int(xs.shape[0])
+        
+        clamped_turn: NDArray[np.float64] = np.clip(turn_effort, -1.0, 1.0)
+        clamped_move: NDArray[np.float64] = np.clip(move_effort, 0.0, 1.0)
+        
+        # Branch rotation dynamics based on the active kinematics profile
+        if isinstance(self.profile, CarProfile):
+            effective_turn: NDArray[np.float64] = clamped_turn * clamped_move
+            is_stationary_turn: NDArray[np.bool_] = np.zeros(
+                n, dtype=np.bool_
+            )
+        else:
+            effective_turn = clamped_turn
+            is_stationary_turn = (
+                (np.abs(clamped_turn) > 0.05) & (clamped_move < 0.05)
+            )
+            
+        new_headings: NDArray[np.float64] = (
+            headings + (effective_turn * self.rad_per_frame)
+        ) % (2.0 * math.pi)
+        
+        no_move: NDArray[np.bool_] = clamped_move < 1e-4
+        step_dist: NDArray[np.float64] = clamped_move * self.move_speed
+        px: NDArray[np.float64] = xs + (np.cos(new_headings) * step_dist)
+        py: NDArray[np.float64] = ys + (np.sin(new_headings) * step_dist)
+        px = np.where(no_move, xs, px)
+        py = np.where(no_move, ys, py)
+        
+        hit: NDArray[np.bool_] = np.zeros(n, dtype=np.bool_)
+        for _ in range(2):
+            base_tx: NDArray[np.int64] = np.floor(px).astype(np.int64)
+            base_ty: NDArray[np.int64] = np.floor(py).astype(np.int64)
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    tx: NDArray[np.int64] = base_tx + dx
+                    ty: NDArray[np.int64] = base_ty + dy
+                    inb: NDArray[np.bool_] = (
+                        (tx >= 0) & (tx < w) & (ty >= 0) & (ty < h)
+                    )
+                    txc: NDArray[np.int64] = np.clip(tx, 0, w - 1)
+                    tyc: NDArray[np.int64] = np.clip(ty, 0, h - 1)
+                    is_wall: NDArray[np.bool_] = inb & wall_grid[tyc, txc]
+                    if not bool(is_wall.any()):
+                        continue
+                    cx: NDArray[np.float64] = np.clip(
+                        px, tx.astype(np.float64), (tx + 1).astype(np.float64)
+                    )
+                    cy: NDArray[np.float64] = np.clip(
+                        py, ty.astype(np.float64), (ty + 1).astype(np.float64)
+                    )
+                    ddx: NDArray[np.float64] = px - cx
+                    ddy: NDArray[np.float64] = py - cy
+                    dist_sq: NDArray[np.float64] = (ddx * ddx) + (ddy * ddy)
+                    pen: NDArray[np.bool_] = is_wall & (dist_sq < (r * r))
+                    hit |= pen
+                    if not bool(pen.any()):
+                        continue
+                    dist: NDArray[np.float64] = np.sqrt(dist_sq)
+                    overlap: NDArray[np.float64] = r - dist
+                    zero: NDArray[np.bool_] = pen & (dist_sq < 1e-12)
+                    with np.errstate(divide="ignore", invalid="ignore"):
+                        nrm_x: NDArray[np.float64] = np.where(
+                            dist > 1e-6, ddx / dist, 0.0
+                        )
+                        nrm_y: NDArray[np.float64] = np.where(
+                            dist > 1e-6, ddy / dist, 0.0
+                        )
+                    px = np.where(pen, px + (nrm_x * overlap), px)
+                    py = np.where(pen, py + (nrm_y * overlap), py)
+                    px = np.where(zero, px + 0.01, px)
+                    py = np.where(zero, py + 0.01, py)
+        px = np.where(no_move, xs, px)
+        py = np.where(no_move, ys, py)
+        hit = np.where(no_move, False, hit)
+        return px, py, new_headings, hit, is_stationary_turn
 
     def interpolate_pixel_pos(
         self,

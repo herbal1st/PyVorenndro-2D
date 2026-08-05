@@ -27,11 +27,15 @@ def main() -> None:
         sys.exit(1)
 
     # 2. Initialize Pygame GUI Window
+        # 2. Initialize Pygame GUI Window
     pygame.init()
+    pygame.key.set_repeat(300, 50)
     screen: pygame.Surface = pygame.display.set_mode(
         (config.SCREEN_WIDTH, config.SCREEN_HEIGHT)
     )
-    pygame.display.set_caption("PyVorenndro 2D - Neuroevolution Visualizer")
+    pygame.display.set_caption(
+        "PyVorenndro 2D - Neuroevolution Visualizer"
+    )
     clock: pygame.time.Clock = pygame.time.Clock()
 
     # 3. Instantiate Layout Sub-Systems using config rectangles
@@ -54,11 +58,47 @@ def main() -> None:
                 if event.key == pygame.K_RETURN:
                     viewport_grid.toggle_camera_mode()
 
+                elif event.key == pygame.K_SPACE:
+                    timeline_scrubber.is_playing = (
+                        not timeline_scrubber.is_playing
+                    )
+
+                elif event.key == pygame.K_RIGHT:
+                    active_frame = min(
+                        active_frame +
+                        config.SCRUBBER_ARROW_JUMP_FRAMES,
+                        config.MAX_SIMULATION_STEPS - 1
+                    )
+
+                elif event.key == pygame.K_LEFT:
+                    active_frame = max(
+                        active_frame -
+                        config.SCRUBBER_ARROW_JUMP_FRAMES,
+                        0
+                    )
+
+                elif event.key == pygame.K_PAGEUP:
+                    active_gen = min(
+                        active_gen +
+                        config.SCRUBBER_PAGE_JUMP_GENS,
+                        total_gens - 1
+                    )
+                    active_frame = 0
+
+                elif event.key == pygame.K_PAGEDOWN:
+                    active_gen = max(
+                        active_gen -
+                        config.SCRUBBER_PAGE_JUMP_GENS,
+                        0
+                    )
+                    active_frame = 0
+
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button in (1, 2, 3, 4, 5):
                     now_ms: int = pygame.time.get_ticks()
                     is_double: bool = (
-                        event.button == 1 and (now_ms - last_click_time) < 300
+                        event.button == 1 and
+                        (now_ms - last_click_time) < 300
                     )
                     if event.button == 1:
                         last_click_time = now_ms
@@ -73,7 +113,9 @@ def main() -> None:
                     gen_data = recorder.get_generation_data(active_gen)
                     total_f = config.MAX_SIMULATION_STEPS
 
-                    was_playing_before: bool = timeline_scrubber.is_playing
+                    was_playing_before: bool = (
+                        timeline_scrubber.is_playing
+                    )
                     new_gen, new_frame = timeline_scrubber.handle_click(
                         m_pos,
                         total_gens,
@@ -81,7 +123,7 @@ def main() -> None:
                         mouse_button=event.button
                     )
 
-                    # Auto-restart if Play is pressed at the end boundary
+                    # Auto-restart if Play is pressed at end boundary
                     if (
                         not was_playing_before and
                         timeline_scrubber.is_playing and
@@ -107,9 +149,11 @@ def main() -> None:
 
         safe_cand_idx: int = min(cand_idx, len(cand_frames) - 1)
         total_f = config.MAX_SIMULATION_STEPS
-        selected_frames = cand_frames[safe_cand_idx] if cand_frames else []
+        selected_frames = (
+            cand_frames[safe_cand_idx] if cand_frames else []
+        )
 
-        # Auto-play generation advancement & repeat mode sequence handling
+        # Auto-play generation advancement & repeat mode handling
         if timeline_scrubber.is_playing:
             active_frame += timeline_scrubber.playback_speed
             if active_frame >= total_f:
@@ -118,10 +162,10 @@ def main() -> None:
                         active_gen += 1
                         active_frame = 0
                     else:
-                        active_gen = 0  # Restart at Generation #0
+                        active_gen = 0
                         active_frame = 0
-                else:  # Repeat One mode
-                    active_frame = 0  # Loop back to frame 0 of same generation
+                else:
+                    active_frame = 0
 
         screen.fill(config.COLOR_BG)
 
@@ -151,7 +195,6 @@ def main() -> None:
         clock.tick(config.FPS)
 
     pygame.quit()
-
 
 if __name__ == "__main__":
     main()

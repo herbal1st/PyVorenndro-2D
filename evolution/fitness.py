@@ -54,20 +54,27 @@ class FitnessEvaluator:
         corner_savings_per_turn: float = 0.586
     ) -> float:
         """
-        Returns theoretical max raw score accounting for corner turn savings.
+        Returns theoretical max raw score for a perfect solver.
+
+        Corner savings reduce effective travel distance and minimum
+        frames, enlarging the time bonus. The BFS score component
+        uses the full initial_bfs_dist — matching calculate_raw_score
+        — so the ceiling is never breached by a real candidate.
         """
         step_frames: float = 1.0 / max(1e-6, move_speed)
-        turn_savings_tiles: float = float(num_turns) * corner_savings_per_turn
+        turn_savings_tiles: float = (
+            float(num_turns) * corner_savings_per_turn
+        )
         eff_bfs_dist: float = max(
             0.0, float(initial_bfs_dist) - turn_savings_tiles
         )
-
         min_travel_frames: float = eff_bfs_dist * step_frames
-        max_bfs_score: float = min_travel_frames * dist_ratio
+        max_bfs_score: float = (
+            float(initial_bfs_dist) * step_frames * dist_ratio
+        )
         max_time_bonus: float = max(
             0.0, float(max_steps) - min_travel_frames
         )
-
         return max_bfs_score + max_time_bonus
 
     @staticmethod

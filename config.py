@@ -18,43 +18,77 @@ MAP_HEIGHT: int = 9  # tiles
 TILE_SIZE: int = 24  # pixels
 WALL_DENSITY: float = 0.45  # ratio
 MAX_MAP_GEN_ATTEMPTS: int = 100  # attempts
-MIN_PATH_DIFFICULTY_RATIO: float = 0.85  # ratio
+MIN_PATH_DIFFICULTY_RATIO: float = 0.55  # ratio
 
 # ------ Sensory & Vision Arc ------
-VISION_RAYS: int = 9  # rays
-VISION_ARC_ANGLE: float = 120.0  # degrees
-VISION_MAX_DIST: float = 6.0  # tiles
+VISION_RAYS: int = 19  # rays
+VISION_ARC_ANGLE: float = 270.0  # degrees
+VISION_MAX_DIST: float = 5.0  # tiles
+INCLUDE_COMPASS: bool = True  # toggle
 
-# ------ Kinematics ------
-KINEMATICS_PROFILE: str = "TANK"  # style
-MOVE_SPEED: float = 0.1  # tiles
-TURN_SPEED: float = 1080.0  # dpsec
+# ------ Kinematics & Physics ------
+KINEMATICS_PROFILE: str = "TANK"  # style (option 2: "CAR")
+MOVE_SPEED: float = 0.15  # tiles
+TURN_SPEED: float = 1800.0  # dpsec
 PLAYER_RADIUS_RATIO: float = 0.5  # ratio
 PLAYER_CAMERA_ZOOM: float = 0.5  # scale
-HEALTH_COLL_DMG_PER_FRAME: float = 0.005  # damage
-HEALTH_IDLE_DMG_PER_FRAME: float = 0.005  # damage
-HEALTH_RECOVERY_RATIO: float = 0.5  # ratio
+HEALTH_COLL_DMG_PER_FRAME: float = 0.003  # damage
+HEALTH_IDLE_DMG_PER_FRAME: float = 0.001  # damage
+HEALTH_IDLE_MOVE_THRESHOLD: float = 0.005  # ratio
+HEALTH_RECOVERY_RATIO: float = 0.05  # ratio
+
+# ------ Anti-Spin & Stagnation Guards ------
+SPIN_PENALTY_ENABLED: bool = True  # toggle
+SPIN_ANGLE_THRESHOLD_DEG: float = 360.0  # degrees
+SPIN_RESET_ANGLE_DEG: float = 5.0 # degrees
+SPIN_DMG_PER_FRAME: float = 0.003  # damage
+STAGNATION_ENABLED: bool = True  # toggle
+STAGNATION_TIMEOUT_RATIO: float = 0.75  # ratio
+STAGNATION_DMG_PER_FRAME: float = 0.001  # damage
 
 # ------ Neural Architecture ------
 NEURAL_HIDDEN_LAYERS: int = 2  # layers
-NEURAL_NEURONS: int = 10  # neurons
+NEURAL_NEURONS: int = 12  # neurons
 
 # ------ Genetic Algorithm & Training ------
 LEARNING_GENERATIONS: int = 200  # generations
 POPULATION_SIZE: int = 16  # candidates
 MAX_SIMULATION_STEPS: int = 1000  # ticks
+MAP_REGIME_GENERATIONS: int = 1  # generations
+REGIME_MIN_GENERATIONS: int = 8  # generations
+REGIME_SOLVE_TARGET: int = 1  # solvers
+REGIME_TRANSITION_MUTATION_BOOST: float = 1.0  # scale
+MAP_DIFFICULTY_MIN: float = 0.55  # ratio
+MAP_DIFFICULTY_MAX: float = 0.85  # ratio
 MUTATION_RATE: float = 0.15  # ratio
-MUTATION_SCALE: float = 0.05  # scale
+MUTATION_SCALE: float = 0.08  # scale
 ELITISM_RATIO: float = 0.20  # ratio
 DEFAULT_PLAYBACK_SPEED: int = 1  # multiplier
+SCRUBBER_ARROW_JUMP_FRAMES: int = 25  # frames
+SCRUBBER_PAGE_JUMP_GENS: int = 1  # generations
 DIST_TO_TIME_BONUS_RATIO: float = 1.0  # ratio
 LOST_HP_SCORE_IMPACT_RATIO: float = 0.5  # ratio
+
+# ------ Parallel Simulation ------
+SIMULATION_WORKERS: int = 0  # workers
+
+# ------ Curriculum (Adaptive Difficulty) ------
+CURRICULUM_ENABLED: bool = True  # toggle
+CURRICULUM_DIFFICULTY_RATIO: float = 0.5  # ratio
+CURRICULUM_START_BFS: int = 8  # tiles
+CURRICULUM_BFS_STEP: int = 2  # tiles
+CURRICULUM_BFS_WINDOW: int = 4  # tiles
+CURRICULUM_MAX_BFS: int = 20  # tiles
+CURRICULUM_MAP_ATTEMPTS: int = 10  # attempts
+CURRICULUM_FAILURES_BEFORE_EASE: int = 2  # failures
 
 # ------ GUI Element Layout Rectangles ------
 LAYOUT_GRID_RECT: Tuple[int, int, int, int] = (20, 20, 800, 600)  # rect
 LAYOUT_PANEL_RECT: Tuple[int, int, int, int] = (840, 20, 420, 140)  # rect
 LAYOUT_GRAPH_RECT: Tuple[int, int, int, int] = (840, 180, 420, 440)  # rect
-LAYOUT_SCRUBBER_RECT: Tuple[int, int, int, int] = (20, 650, 1240, 60)  # rect
+LAYOUT_SCRUBBER_RECT: Tuple[int, int, int, int] = (
+    20, 650, 1240, 60
+)  # rect
 
 # ------ HUD Typography & Element Sizing ------
 HUD_PANEL_TITLE_FONT_SIZE: int = 16  # pt
@@ -103,6 +137,6 @@ COLOR_BUTTON_ACTIVE: Tuple[int, int, int] = (80, 80, 100)  # rgb
 
 # ------ Candidate Facial Expressions ------
 FACE_WALK: str = "o_o"  # expression
-FACE_WALL: str = ">_<"  # expression
+FACE_WALL: str = ">*<"  # expression
 FACE_DEAD: str = "T_T"  # expression
-FACE_EXIT: str = "^_^"  # expression
+FACE_EXIT: str = "^*^"  # expression

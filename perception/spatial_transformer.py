@@ -2,12 +2,13 @@
 Spatial feature compiler and candidate spawn heading randomizer.
 """
 
-import random
 import math
-from typing import Tuple, Optional
+import random
+from typing import Optional, Tuple
 import numpy as np
 from numpy.typing import NDArray
 
+import config
 from core.map_data import MapData
 from perception.vision_arc import VisionArcSampler
 
@@ -59,7 +60,7 @@ class SpatialTransformer:
         map_data: MapData
     ) -> NDArray[np.float32]:
         """
-        Samples wall rays and stereo target compass into 11 channels.
+        Samples wall rays and target compass into 9 to 13 feature channels.
         """
         wall_channels: NDArray[np.float32] = (
             self.sampler.sample_vision_channels(
@@ -71,12 +72,52 @@ class SpatialTransformer:
             candidate_x, candidate_y, heading_rad, map_data.exit_pos
         )
 
-        state_features: NDArray[np.float32] = np.array(
-            [tg_left, tg_right, current_speed, health_ratio],
-            dtype=np.float32
-        )
+        if config.INCLUDE_COMPASS:
+            state_features: NDArray[np.float32] = np.array(
+                [tg_left, tg_right, current_speed, health_ratio],
+                dtype=np.float32
+            )
+        else:
+            state_features = np.array(
+                [current_speed, health_ratio], dtype=np.float32
+            )
 
         return np.concatenate([wall_channels, state_features])
+
+    def compile_feature_batch(
+        self,
+        xs: NDArray[np.float64],
+        ys: NDArray[np.float64],
+        headings: NDArray[np.float64],
+        speeds: NDArray[np.float64],
+        healths: NDArray[np.float64],
+        map_data: MapData,
+        wall_grid: Optional[NDArray[np.bool_]] = None
+    ) -> NDArray[np.float32]:
+        """
+        Vectorized feature compiler for (N,) candidate states.
+        Returns a (N, channels) float32 feature matrix.
+        """
+        wall_channels: NDArray[np.float32] = (
+            self.sampler.sample_vision_channels_batch(
+                xs, ys, headings, map_data, wall_grid
+            )
+        )
+
+        tg_left, tg_right = self._compute_stereo_compass_batch(
+            xs, ys, headings, map_data.exit_pos
+        )
+
+        if config.INCLUDE_COMPASS:
+            state_features: NDArray[np.float32] = np.stack(
+                [tg_left, tg_right, speeds, healths], axis=1
+            ).astype(np.float32)
+        else:
+            state_features = np.stack(
+                [speeds, healths], axis=1
+            ).astype(np.float32)
+
+        return np.concatenate([wall_channels, state_features], axis=1)
 
     def _compute_stereo_compass(
         self,
@@ -109,3 +150,43 @@ class SpatialTransformer:
             tg_right = 1.0 - (angle_delta / math.pi)
 
         return max(0.0, min(1.0, tg_left)), max(0.0, min(1.0, tg_right))
+
+    def _compute_stereo_compass_batch(
+        self,
+        cxs: NDArray[np.float64],
+        cys: NDArray[np.float64],
+        headings: NDArray[np.float64],
+        exit_pos: Tuple[int, int]
+    ) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """
+        Vectorized stereo binocular target compass for (N,) headings.
+        """
+        ex: float = float(exit_pos[0]) + 0.5
+        ey: float = float(exit_pos[1]) + 0.5
+
+        dx: NDArray[np.float64] = ex - cxs
+        dy: NDArray[np.float64] = ey - cys
+
+        target_angle: NDArray[np.float64] = np.arctan2(dy, dx)
+        angle_delta: NDArray[np.float64] = (
+            target_angle - headings
+        ) % (2.0 * math.pi)
+        angle_delta = np.where(
+            angle_delta > math.pi, angle_delta - 2.0 * math.pi, angle_delta
+        )
+
+        tg_left: NDArray[np.float64] = np.where(
+            (angle_delta >= -math.pi) & (angle_delta <= 0.0),
+            1.0 - (np.abs(angle_delta) / math.pi),
+            0.0,
+        )
+        tg_right: NDArray[np.float64] = np.where(
+            (angle_delta >= 0.0) & (angle_delta <= math.pi),
+            1.0 - (angle_delta / math.pi),
+            0.0,
+        )
+
+        return (
+            np.clip(tg_left, 0.0, 1.0),
+            np.clip(tg_right, 0.0, 1.0),
+        )

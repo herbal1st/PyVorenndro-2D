@@ -3,6 +3,7 @@ Data structures for 2D map grids and compact PyBiwis bitmask encoding.
 """
 
 from typing import List, Tuple
+import numpy as np
 
 
 class MapData:
@@ -49,6 +50,12 @@ class MapData:
         Checks if tile coordinates are open for traversal.
         """
         return not self.is_wall(x, y)
+
+    def build_wall_grid(self) -> np.ndarray:
+        """
+        Returns a boolean (height, width) wall lookup grid for vectorized ops.
+        """
+        return np.array(self.grid, dtype=np.bool_)
 
     def encode_bitmask(self) -> List[int]:
         """
