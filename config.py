@@ -108,8 +108,8 @@ TRAINING_BACKEND: str = "auto"
 # When the GPU backend is active these replace the CPU defaults so a single
 # champion generation runs thousands of parallel simulations on the device.
 
-SIMULATION_RUNS_GPU: int = 16384  # total parallel simulations per GPU generation
-POPULATION_SIZE_GPU: int = 16  # candidate agents evaluated per GPU generation
+SIMULATION_RUNS_GPU: int = 65536  # total parallel simulations per GPU generation
+POPULATION_SIZE_GPU: int = 32  # candidate agents evaluated per GPU generation
 
 # Hardware-aware auto-configuration. On startup the trainer measures the real
 # simulation throughput of this machine's backend (a short calibration run on

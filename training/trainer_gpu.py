@@ -50,6 +50,173 @@ def torch_available() -> bool:
         return False
 
 
+_FUSED_VISION_COMPILED: Any = None
+
+
+def _sample_vision_fused(
+    sim: "TorchSimulator",
+    xs: torch.Tensor,
+    ys: torch.Tensor,
+    headings: torch.Tensor,
+    wall_bool: torch.Tensor,
+) -> torch.Tensor:
+    """
+    Breakless DDA variant of ``TorchSimulator.sample_vision``.
+
+    Produces bit-identical output to the eager version: the ``done.all()``
+    early break is a pure no-op because the final ``where(done, prox, zero)``
+    already zeroes anything unfinished. Dropping the per-iteration device sync
+    lets ``torch.compile`` fuse the entire ray march into a single kernel,
+    which is the dominant per-step cost in the GPU training loop.
+    """
+    n_cands: int = int(xs.shape[0])
+    if n_cands == 0:
+        return torch.zeros(
+            (0, sim.num_rays), dtype=sim.dtype, device=sim.device
+        )
+
+    h: int = int(wall_bool.shape[1])
+    w: int = int(wall_bool.shape[2])
+    n_rays: int = sim.num_rays
+    n_total: int = n_cands * n_rays
+
+    angles: torch.Tensor = headings[:, None] + sim.offsets[None, :]
+    dir_x: torch.Tensor = torch.cos(angles).reshape(-1)
+    dir_y: torch.Tensor = torch.sin(angles).reshape(-1)
+
+    ox: torch.Tensor = xs.repeat_interleave(n_rays)
+    oy: torch.Tensor = ys.repeat_interleave(n_rays)
+    run_idx: torch.Tensor = torch.arange(
+        n_cands, device=sim.device
+    ).repeat_interleave(n_rays)
+
+    tile_x: torch.Tensor = torch.floor(ox).to(torch.int64)
+    tile_y: torch.Tensor = torch.floor(oy).to(torch.int64)
+
+    prox: torch.Tensor = torch.zeros(
+        n_total, dtype=sim.dtype, device=sim.device
+    )
+    done: torch.Tensor = torch.zeros(
+        n_total, dtype=torch.bool, device=sim.device
+    )
+
+    inb: torch.Tensor = (
+        (tile_x >= 0) & (tile_x < w) & (tile_y >= 0) & (tile_y < h)
+    )
+    txc: torch.Tensor = tile_x.clamp(0, w - 1)
+    tyc: torch.Tensor = tile_y.clamp(0, h - 1)
+    is_wall: torch.Tensor = wall_bool[run_idx, tyc, txc]
+    inside_wall: torch.Tensor = (inb & is_wall).bool()
+    prox = torch.where(inside_wall, torch.ones_like(prox), prox)
+    done = done | inside_wall
+
+    step_x: torch.Tensor = torch.where(
+        dir_x > 0.0,
+        torch.tensor(1, dtype=torch.int64, device=sim.device),
+        torch.where(
+            dir_x < 0.0,
+            torch.tensor(-1, dtype=torch.int64, device=sim.device),
+            torch.tensor(0, dtype=torch.int64, device=sim.device),
+        ),
+    )
+    step_y: torch.Tensor = torch.where(
+        dir_y > 0.0,
+        torch.tensor(1, dtype=torch.int64, device=sim.device),
+        torch.where(
+            dir_y < 0.0,
+            torch.tensor(-1, dtype=torch.int64, device=sim.device),
+            torch.tensor(0, dtype=torch.int64, device=sim.device),
+        ),
+    )
+
+    inf: torch.Tensor = torch.tensor(
+        float("inf"), dtype=sim.dtype, device=sim.device
+    )
+    one: torch.Tensor = torch.tensor(
+        1.0, dtype=sim.dtype, device=sim.device
+    )
+    zero: torch.Tensor = torch.tensor(
+        0.0, dtype=sim.dtype, device=sim.device
+    )
+
+    t_delta_x: torch.Tensor = torch.where(
+        dir_x.abs() > 1e-9, (one / dir_x).abs(), inf
+    )
+    t_delta_y: torch.Tensor = torch.where(
+        dir_y.abs() > 1e-9, (one / dir_y).abs(), inf
+    )
+    t_max_x: torch.Tensor = torch.where(
+        step_x > 0,
+        (tile_x.to(sim.dtype) + one - ox) / dir_x,
+        torch.where(
+            step_x < 0,
+            (tile_x.to(sim.dtype) - ox) / dir_x,
+            inf,
+        ),
+    )
+    t_max_y: torch.Tensor = torch.where(
+        step_y > 0,
+        (tile_y.to(sim.dtype) + one - oy) / dir_y,
+        torch.where(
+            step_y < 0,
+            (tile_y.to(sim.dtype) - oy) / dir_y,
+            inf,
+        ),
+    )
+
+    max_t: float = sim.max_dist
+    max_iter: int = int(2.0 * max_t) + 4
+
+    for _ in range(max_iter):
+        active: torch.Tensor = ~done
+        move_x: torch.Tensor = t_max_x < t_max_y
+        hit_t: torch.Tensor = torch.where(move_x, t_max_x, t_max_y)
+        tile_x = torch.where(move_x, tile_x + step_x, tile_x)
+        tile_y = torch.where(move_x, tile_y, tile_y + step_y)
+        t_max_x = torch.where(move_x, t_max_x + t_delta_x, t_max_x)
+        t_max_y = torch.where(move_x, t_max_y, t_max_y + t_delta_y)
+
+        no_hit: torch.Tensor = hit_t > max_t
+        prox = torch.where(active & no_hit, zero, prox)
+        done = done | (active & no_hit)
+
+        inb = (
+            (tile_x >= 0) & (tile_x < w) & (tile_y >= 0) & (tile_y < h)
+        )
+        txc = tile_x.clamp(0, w - 1)
+        tyc = tile_y.clamp(0, h - 1)
+        is_wall = wall_bool[run_idx, tyc, txc]
+        wall_hit: torch.Tensor = (inb & is_wall).bool()
+        blocked: torch.Tensor = (
+            active & ~no_hit & (wall_hit | ~inb)
+        )
+        prox = torch.where(
+            blocked,
+            torch.clamp(one - (hit_t / max_t), 0.0, 1.0),
+            prox,
+        )
+        done = done | blocked
+
+    prox = torch.where(done, prox, zero)
+    return prox.reshape(n_cands, n_rays)
+
+
+def _compiled_sample_vision() -> Any:
+    """
+    Lazily compiles the fused breakless DDA once. Only used on CUDA; any
+    compilation failure caches a False so the eager path is used instead.
+    """
+    global _FUSED_VISION_COMPILED
+
+    if _FUSED_VISION_COMPILED is None and _TORCH_OK:
+        try:
+            _FUSED_VISION_COMPILED = torch.compile(_sample_vision_fused)
+        except Exception:
+            _FUSED_VISION_COMPILED = False
+
+    return _FUSED_VISION_COMPILED or None
+
+
 class TorchAgentModule(nn.Module):
     """
     MLP mirroring :class:`Agent` but as torch parameters for GPU forward pass.
@@ -153,6 +320,26 @@ class TorchSimulator:
         tile (or map edge) it enters. The exact tile-resolution hit rule
         matches the CPU path bit-for-bit; only float32 arithmetic leaves
         sub-float32 drift versus the float64 CPU reference.
+        """
+        if getattr(self.device, "type", "cpu") == "cuda":
+            fused = _compiled_sample_vision()
+            if fused is not None:
+                try:
+                    return fused(self, xs, ys, headings, wall_bool)
+                except Exception:
+                    pass
+        return self._sample_vision_eager(xs, ys, headings, wall_bool)
+
+    def _sample_vision_eager(
+        self,
+        xs: torch.Tensor,
+        ys: torch.Tensor,
+        headings: torch.Tensor,
+        wall_bool: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        Eager (non-compiled) DDA fallback with the early-exit ``done.all()``
+        sync intact.
         """
         n_cands: int = int(xs.shape[0])
         if n_cands == 0:
