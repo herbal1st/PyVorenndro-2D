@@ -4,11 +4,10 @@ Spatial feature compiler and candidate spawn heading randomizer.
 
 import math
 import random
-from typing import Optional, Tuple
+from typing import Tuple, Optional, Dict, Any
 import numpy as np
 from numpy.typing import NDArray
 
-import config
 from core.map_data import MapData
 from perception.vision_arc import VisionArcSampler
 
@@ -18,11 +17,16 @@ class SpatialTransformer:
     Compiles sensory observations into normalized flat neural vectors.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        profile_config: Optional[Dict[str, Any]] = None
+    ) -> None:
         """
-        Initializes internal vision arc sampler.
+        Initializes internal vision arc sampler with profile configuration.
         """
-        self.sampler: VisionArcSampler = VisionArcSampler()
+        self.sampler: VisionArcSampler = VisionArcSampler(
+            profile_config=profile_config
+        )
 
     @staticmethod
     def generate_random_heading(
@@ -57,11 +61,19 @@ class SpatialTransformer:
         heading_rad: float,
         current_speed: float,
         health_ratio: float,
-        map_data: MapData
+        map_data: MapData,
+        current_dist: Optional[float] = None,
+        profile_config: Optional[Dict[str, Any]] = None
     ) -> NDArray[np.float32]:
         """
-        Samples wall rays and target compass into 9 to 13 feature channels.
+        Samples wall rays and target compass into flat feature channels.
         """
+        sensory: Dict[str, Any] = (
+            profile_config.get("sensory", {}) if profile_config else {}
+        )
+        include_compass: bool = bool(sensory.get("include_compass", False))
+        include_bfs: bool = bool(sensory.get("include_bfs_sensor", False))
+
         wall_channels: NDArray[np.float32] = (
             self.sampler.sample_vision_channels(
                 candidate_x, candidate_y, heading_rad, map_data
@@ -72,7 +84,7 @@ class SpatialTransformer:
             candidate_x, candidate_y, heading_rad, map_data.exit_pos
         )
 
-        if config.INCLUDE_COMPASS:
+        if include_compass:
             state_features: NDArray[np.float32] = np.array(
                 [tg_left, tg_right, current_speed, health_ratio],
                 dtype=np.float32
@@ -80,6 +92,22 @@ class SpatialTransformer:
         else:
             state_features = np.array(
                 [current_speed, health_ratio], dtype=np.float32
+            )
+
+        if include_bfs:
+            max_span: float = float(map_data.height + map_data.width)
+            if current_dist is None:
+                dist_channel: NDArray[np.float32] = np.zeros(
+                    (1,), dtype=np.float32
+                )
+            else:
+                dist_channel = np.array(
+                    [max(0.0, min(1.0, float(current_dist) / max_span))],
+                    dtype=np.float32
+                )
+
+            state_features = np.concatenate(
+                [state_features, dist_channel]
             )
 
         return np.concatenate([wall_channels, state_features])
@@ -91,24 +119,43 @@ class SpatialTransformer:
         headings: NDArray[np.float64],
         speeds: NDArray[np.float64],
         healths: NDArray[np.float64],
-        map_data: MapData,
-        wall_grid: Optional[NDArray[np.bool_]] = None
+        map_data: MapData = None,
+        wall_grid: Optional[np.ndarray] = None,
+        wall_grids: Optional[np.ndarray] = None,
+        exit_positions: Optional[np.ndarray] = None,
+        current_dists: Optional[np.ndarray] = None,
+        profile_config: Optional[Dict[str, Any]] = None
     ) -> NDArray[np.float32]:
         """
         Vectorized feature compiler for (N,) candidate states.
-        Returns a (N, channels) float32 feature matrix.
         """
-        wall_channels: NDArray[np.float32] = (
-            self.sampler.sample_vision_channels_batch(
+        sensory: Dict[str, Any] = (
+            profile_config.get("sensory", {}) if profile_config else {}
+        )
+        include_compass: bool = bool(sensory.get("include_compass", False))
+        include_bfs: bool = bool(sensory.get("include_bfs_sensor", False))
+
+        if wall_grids is not None:
+            wall_channels: NDArray[np.float32] = (
+                self.sampler.sample_vision_channels_batch(
+                    xs, ys, headings, map_data, wall_grids=wall_grids
+                )
+            )
+        else:
+            wall_channels = self.sampler.sample_vision_channels_batch(
                 xs, ys, headings, map_data, wall_grid
             )
-        )
 
-        tg_left, tg_right = self._compute_stereo_compass_batch(
-            xs, ys, headings, map_data.exit_pos
-        )
+        if exit_positions is not None:
+            tg_left, tg_right = self._compute_stereo_compass_batch(
+                xs, ys, headings, exit_positions
+            )
+        else:
+            tg_left, tg_right = self._compute_stereo_compass_batch(
+                xs, ys, headings, map_data.exit_pos
+            )
 
-        if config.INCLUDE_COMPASS:
+        if include_compass:
             state_features: NDArray[np.float32] = np.stack(
                 [tg_left, tg_right, speeds, healths], axis=1
             ).astype(np.float32)
@@ -117,7 +164,77 @@ class SpatialTransformer:
                 [speeds, healths], axis=1
             ).astype(np.float32)
 
+        if include_bfs:
+            if current_dists is not None and wall_grids is not None:
+                max_span: float = float(
+                    wall_grids.shape[1] + wall_grids.shape[2]
+                )
+                dist_channel: NDArray[np.float32] = np.clip(
+                    np.asarray(
+                        current_dists, dtype=np.float64
+                    ) / max_span,
+                    0.0,
+                    1.0
+                ).astype(np.float32).reshape(-1, 1)
+            else:
+                dist_channel = np.zeros(
+                    (len(xs), 1), dtype=np.float32
+                )
+
+            state_features = np.concatenate(
+                [state_features, dist_channel], axis=1
+            )
+
         return np.concatenate([wall_channels, state_features], axis=1)
+
+    def _compute_stereo_compass_batch(
+        self,
+        cxs: NDArray[np.float64],
+        cys: NDArray[np.float64],
+        headings: NDArray[np.float64],
+        exit_pos: object
+    ) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """
+        Vectorized stereo binocular target compass for (N,) headings.
+        """
+        if isinstance(exit_pos, tuple):
+            ex: NDArray[np.float64] = np.full_like(
+                cxs, float(exit_pos[0]) + 0.5
+            )
+            ey: NDArray[np.float64] = np.full_like(
+                cys, float(exit_pos[1]) + 0.5
+            )
+        else:
+            ep: np.ndarray = np.asarray(exit_pos, dtype=np.float64)
+            ex = ep[:, 0] + 0.5
+            ey = ep[:, 1] + 0.5
+
+        dx: NDArray[np.float64] = ex - cxs
+        dy: NDArray[np.float64] = ey - cys
+
+        target_angle: NDArray[np.float64] = np.arctan2(dy, dx)
+        angle_delta: NDArray[np.float64] = (
+            target_angle - headings
+        ) % (2.0 * math.pi)
+        angle_delta = np.where(
+            angle_delta > math.pi, angle_delta - 2.0 * math.pi, angle_delta
+        )
+
+        tg_left: NDArray[np.float64] = np.where(
+            (angle_delta >= -math.pi) & (angle_delta <= 0.0),
+            1.0 - (np.abs(angle_delta) / math.pi),
+            0.0,
+        )
+        tg_right: NDArray[np.float64] = np.where(
+            (angle_delta >= 0.0) & (angle_delta <= math.pi),
+            1.0 - (angle_delta / math.pi),
+            0.0,
+        )
+
+        return (
+            np.clip(tg_left, 0.0, 1.0),
+            np.clip(tg_right, 0.0, 1.0),
+        )
 
     def _compute_stereo_compass(
         self,
@@ -150,43 +267,3 @@ class SpatialTransformer:
             tg_right = 1.0 - (angle_delta / math.pi)
 
         return max(0.0, min(1.0, tg_left)), max(0.0, min(1.0, tg_right))
-
-    def _compute_stereo_compass_batch(
-        self,
-        cxs: NDArray[np.float64],
-        cys: NDArray[np.float64],
-        headings: NDArray[np.float64],
-        exit_pos: Tuple[int, int]
-    ) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
-        """
-        Vectorized stereo binocular target compass for (N,) headings.
-        """
-        ex: float = float(exit_pos[0]) + 0.5
-        ey: float = float(exit_pos[1]) + 0.5
-
-        dx: NDArray[np.float64] = ex - cxs
-        dy: NDArray[np.float64] = ey - cys
-
-        target_angle: NDArray[np.float64] = np.arctan2(dy, dx)
-        angle_delta: NDArray[np.float64] = (
-            target_angle - headings
-        ) % (2.0 * math.pi)
-        angle_delta = np.where(
-            angle_delta > math.pi, angle_delta - 2.0 * math.pi, angle_delta
-        )
-
-        tg_left: NDArray[np.float64] = np.where(
-            (angle_delta >= -math.pi) & (angle_delta <= 0.0),
-            1.0 - (np.abs(angle_delta) / math.pi),
-            0.0,
-        )
-        tg_right: NDArray[np.float64] = np.where(
-            (angle_delta >= 0.0) & (angle_delta <= math.pi),
-            1.0 - (angle_delta / math.pi),
-            0.0,
-        )
-
-        return (
-            np.clip(tg_left, 0.0, 1.0),
-            np.clip(tg_right, 0.0, 1.0),
-        )

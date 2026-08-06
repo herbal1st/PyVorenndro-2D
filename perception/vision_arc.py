@@ -3,11 +3,10 @@ Grid-aligned DDA raycaster for wall proximity sensing.
 """
 
 import math
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
 import numpy as np
 from numpy.typing import NDArray
 
-import config
 from core.map_data import MapData
 
 
@@ -18,13 +17,19 @@ class VisionArcSampler:
 
     def __init__(
         self,
-        num_rays: int = config.VISION_RAYS,
-        arc_angle_deg: float = config.VISION_ARC_ANGLE,
-        max_dist: float = config.VISION_MAX_DIST
+        num_rays: int = 9,
+        arc_angle_deg: float = 120.0,
+        max_dist: float = 5.0,
+        profile_config: Optional[Dict[str, Any]] = None
     ) -> None:
         """
         Initializes relative ray angles across the visual arc.
         """
+        if profile_config is not None:
+            sens: Dict[str, Any] = profile_config.get("sensory", {})
+            num_rays = int(sens.get("vision_rays", num_rays))
+            arc_angle_deg = float(sens.get("vision_arc_angle", arc_angle_deg))
+
         self.num_rays: int = num_rays
         self.max_dist: float = max_dist
 
@@ -62,70 +67,83 @@ class VisionArcSampler:
 
     def sample_vision_channels_batch(
         self,
-        xs: NDArray[np.float64],
-        ys: NDArray[np.float64],
-        headings: NDArray[np.float64],
-        map_data: MapData,
-        wall_grid: Optional[NDArray[np.bool_]] = None
+        xs: np.ndarray,
+        ys: np.ndarray,
+        headings: np.ndarray,
+        map_data: MapData = None,
+        wall_grid: np.ndarray = None,
+        wall_grids: np.ndarray = None
     ) -> NDArray[np.float32]:
         """
         Vectorized Amanatides-Woo DDA across (N,) origins and headings.
-        Returns a (N, VISION_RAYS) float32 wall proximity array.
         """
         n_cands: int = int(xs.shape[0])
         if n_cands == 0:
             return np.zeros((0, self.num_rays), dtype=np.float32)
 
-        if wall_grid is None:
-            wall_grid = map_data.build_wall_grid()
-        h, w = wall_grid.shape
+        multi_grid: bool = wall_grids is not None
 
-        offsets: NDArray[np.float64] = np.asarray(
+        if multi_grid:
+            h, w = wall_grids.shape[1], wall_grids.shape[2]
+        else:
+            if wall_grid is None:
+                wall_grid = map_data.build_wall_grid()
+            h, w = wall_grid.shape
+
+        offsets: np.ndarray = np.asarray(
             self.relative_angles, dtype=np.float64
         )
-        angles: NDArray[np.float64] = headings[:, None] + offsets[None, :]
-        dir_x: NDArray[np.float64] = np.cos(angles).ravel()
-        dir_y: NDArray[np.float64] = np.sin(angles).ravel()
+        angles: np.ndarray = headings[:, None] + offsets[None, :]
+        dir_x: np.ndarray = np.cos(angles).ravel()
+        dir_y: np.ndarray = np.sin(angles).ravel()
 
-        ox: NDArray[np.float64] = np.repeat(xs, self.num_rays)
-        oy: NDArray[np.float64] = np.repeat(ys, self.num_rays)
+        ox: np.ndarray = np.repeat(xs, self.num_rays)
+        oy: np.ndarray = np.repeat(ys, self.num_rays)
 
-        tile_x: NDArray[np.int64] = np.floor(ox).astype(np.int64)
-        tile_y: NDArray[np.int64] = np.floor(oy).astype(np.int64)
+        run_idx: np.ndarray = np.repeat(
+            np.arange(n_cands), self.num_rays
+        )
+
+        tile_x: np.ndarray = np.floor(ox).astype(np.int64)
+        tile_y: np.ndarray = np.floor(oy).astype(np.int64)
 
         n_rays: int = int(ox.shape[0])
-        prox: NDArray[np.float64] = np.zeros(n_rays, dtype=np.float64)
-        done: NDArray[np.bool_] = np.zeros(n_rays, dtype=np.bool_)
+        prox: np.ndarray = np.zeros(n_rays, dtype=np.float64)
+        done: np.ndarray = np.zeros(n_rays, dtype=np.bool_)
 
-        inb: NDArray[np.bool_] = (
+        inb: np.ndarray = (
             (tile_x >= 0) & (tile_x < w) & (tile_y >= 0) & (tile_y < h)
         )
-        txc: NDArray[np.int64] = np.clip(tile_x, 0, w - 1)
-        tyc: NDArray[np.int64] = np.clip(tile_y, 0, h - 1)
-        inside_wall: NDArray[np.bool_] = inb & wall_grid[tyc, txc]
+        txc: np.ndarray = np.clip(tile_x, 0, w - 1)
+        tyc: np.ndarray = np.clip(tile_y, 0, h - 1)
+        if multi_grid:
+            is_wall_at: np.ndarray = wall_grids[run_idx, tyc, txc]
+        else:
+            is_wall_at = wall_grid[tyc, txc]
+        inside_wall: np.ndarray = inb & is_wall_at
         prox[inside_wall] = 1.0
         done[inside_wall] = True
 
-        step_x: NDArray[np.int64] = np.where(
+        step_x: np.ndarray = np.where(
             dir_x > 0.0, 1, np.where(dir_x < 0.0, -1, 0)
         )
-        step_y: NDArray[np.int64] = np.where(
+        step_y: np.ndarray = np.where(
             dir_y > 0.0, 1, np.where(dir_y < 0.0, -1, 0)
         )
 
         with np.errstate(divide="ignore", invalid="ignore"):
-            t_delta_x: NDArray[np.float64] = np.where(
+            t_delta_x: np.ndarray = np.where(
                 np.abs(dir_x) > 1e-9, np.abs(1.0 / dir_x), np.inf
             )
-            t_delta_y: NDArray[np.float64] = np.where(
+            t_delta_y: np.ndarray = np.where(
                 np.abs(dir_y) > 1e-9, np.abs(1.0 / dir_y), np.inf
             )
-            t_max_x: NDArray[np.float64] = np.where(
+            t_max_x: np.ndarray = np.where(
                 step_x > 0,
                 (tile_x + 1.0 - ox) / dir_x,
                 np.where(step_x < 0, (tile_x - ox) / dir_x, np.inf),
             )
-            t_max_y: NDArray[np.float64] = np.where(
+            t_max_y: np.ndarray = np.where(
                 step_y > 0,
                 (tile_y + 1.0 - oy) / dir_y,
                 np.where(step_y < 0, (tile_y - oy) / dir_y, np.inf),
@@ -135,18 +153,18 @@ class VisionArcSampler:
         max_iter: int = int(2.0 * max_t) + 4
 
         for _ in range(max_iter):
-            active: NDArray[np.bool_] = ~done
-            if not bool(active.any()):
+            active: np.ndarray = ~done
+            if not active.any():
                 break
 
-            move_x: NDArray[np.bool_] = t_max_x < t_max_y
-            hit_t: NDArray[np.float64] = np.where(move_x, t_max_x, t_max_y)
+            move_x: np.ndarray = t_max_x < t_max_y
+            hit_t: np.ndarray = np.where(move_x, t_max_x, t_max_y)
             tile_x = np.where(move_x, tile_x + step_x, tile_x)
             tile_y = np.where(move_x, tile_y, tile_y + step_y)
             t_max_x = np.where(move_x, t_max_x + t_delta_x, t_max_x)
             t_max_y = np.where(move_x, t_max_y, t_max_y + t_delta_y)
 
-            no_hit: NDArray[np.bool_] = hit_t > max_t
+            no_hit: np.ndarray = hit_t > max_t
             prox = np.where(active & no_hit, 0.0, prox)
             done |= active & no_hit
 
@@ -155,8 +173,12 @@ class VisionArcSampler:
             )
             txc = np.clip(tile_x, 0, w - 1)
             tyc = np.clip(tile_y, 0, h - 1)
-            wall_hit: NDArray[np.bool_] = inb & wall_grid[tyc, txc]
-            blocked: NDArray[np.bool_] = active & ~no_hit & (wall_hit | ~inb)
+            if multi_grid:
+                is_wall_at = wall_grids[run_idx, tyc, txc]
+            else:
+                is_wall_at = wall_grid[tyc, txc]
+            wall_hit: np.ndarray = inb & is_wall_at
+            blocked: np.ndarray = active & ~no_hit & (wall_hit | ~inb)
             prox = np.where(
                 blocked,
                 np.clip(1.0 - (hit_t / max_t), 0.0, 1.0),

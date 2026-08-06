@@ -1,15 +1,14 @@
-"""
-Global configuration settings for PyVorenndro 2D engine.
-"""
+"""Global configuration settings for PyVorenndro 2D engine."""
 
 from typing import Tuple
 
-# ------ Display & Grid Layout ------
+# ------ Active Profile Selection ------
+ACTIVE_PROFILE_ID: str = "scooterking38"  # profile
+
+# ------ Display & Window Layout ------
 SCREEN_WIDTH: int = 1280  # pixels
 SCREEN_HEIGHT: int = 720  # pixels
 FPS: int = 60  # hertz
-GRID_ROWS: int = 4  # count
-GRID_COLS: int = 4  # count
 
 # ------ World & Map Parameters ------
 MAP_TYPE: str = "BRANCHING WALLS"  # style
@@ -18,69 +17,58 @@ MAP_HEIGHT: int = 9  # tiles
 TILE_SIZE: int = 24  # pixels
 WALL_DENSITY: float = 0.45  # ratio
 MAX_MAP_GEN_ATTEMPTS: int = 100  # attempts
-MIN_PATH_DIFFICULTY_RATIO: float = 0.55  # ratio
-
-# ------ Sensory & Vision Arc ------
-VISION_RAYS: int = 19  # rays
-VISION_ARC_ANGLE: float = 270.0  # degrees
-VISION_MAX_DIST: float = 5.0  # tiles
-INCLUDE_COMPASS: bool = True  # toggle
-
-# ------ Kinematics & Physics ------
-KINEMATICS_PROFILE: str = "TANK"  # style (option 2: "CAR")
-MOVE_SPEED: float = 0.15  # tiles
-TURN_SPEED: float = 1800.0  # dpsec
-PLAYER_RADIUS_RATIO: float = 0.5  # ratio
-PLAYER_CAMERA_ZOOM: float = 0.5  # scale
-HEALTH_COLL_DMG_PER_FRAME: float = 0.003  # damage
-HEALTH_IDLE_DMG_PER_FRAME: float = 0.001  # damage
-HEALTH_IDLE_MOVE_THRESHOLD: float = 0.005  # ratio
-HEALTH_RECOVERY_RATIO: float = 0.05  # ratio
-
-# ------ Anti-Spin & Stagnation Guards ------
-SPIN_PENALTY_ENABLED: bool = True  # toggle
-SPIN_ANGLE_THRESHOLD_DEG: float = 360.0  # degrees
-SPIN_RESET_ANGLE_DEG: float = 5.0 # degrees
-SPIN_DMG_PER_FRAME: float = 0.003  # damage
-STAGNATION_ENABLED: bool = True  # toggle
-STAGNATION_TIMEOUT_RATIO: float = 0.75  # ratio
-STAGNATION_DMG_PER_FRAME: float = 0.001  # damage
-
-# ------ Neural Architecture ------
-NEURAL_HIDDEN_LAYERS: int = 2  # layers
-NEURAL_NEURONS: int = 12  # neurons
+MIN_PATH_DIFFICULTY_RATIO: float = 0.85  # ratio
 
 # ------ Genetic Algorithm & Training ------
-LEARNING_GENERATIONS: int = 200  # generations
-POPULATION_SIZE: int = 16  # candidates
+LEARNING_GENERATIONS: int = 100  # generations
+SIMULATION_RUNS: int = 100  # simulations
+POPULATION_SIZE: int = 2  # candidates
 MAX_SIMULATION_STEPS: int = 1000  # ticks
 MAP_REGIME_GENERATIONS: int = 1  # generations
 REGIME_MIN_GENERATIONS: int = 8  # generations
 REGIME_SOLVE_TARGET: int = 1  # solvers
-REGIME_TRANSITION_MUTATION_BOOST: float = 1.0  # scale
+REGIME_TRANSITION_MUTATION_BOOST: float = 1.0  # ratio
 MAP_DIFFICULTY_MIN: float = 0.55  # ratio
 MAP_DIFFICULTY_MAX: float = 0.85  # ratio
-MUTATION_RATE: float = 0.15  # ratio
-MUTATION_SCALE: float = 0.08  # scale
+MUTATION_RATE: float = 0.25  # ratio
+MUTATION_SCALE: float = 0.12  # scale
+MUTATION_SCALE_MIN: float = 0.002  # scale
+MUTATION_SCALE_MAX: float = 0.5  # scale
+MUTATION_ADAPT_WINDOW: int = 8  # generations
+STAGNATION_BUMP_GENERATIONS: int = 8  # generations
+STAGNATION_BUMP_FACTOR: float = 4.0  # multiplier
 ELITISM_RATIO: float = 0.20  # ratio
 DEFAULT_PLAYBACK_SPEED: int = 1  # multiplier
-SCRUBBER_ARROW_JUMP_FRAMES: int = 25  # frames
-SCRUBBER_PAGE_JUMP_GENS: int = 1  # generations
 DIST_TO_TIME_BONUS_RATIO: float = 1.0  # ratio
 LOST_HP_SCORE_IMPACT_RATIO: float = 0.5  # ratio
+RECORDER_MAX_GENERATIONS: int = 1000  # generations
 
 # ------ Parallel Simulation ------
 SIMULATION_WORKERS: int = 0  # workers
+TRAINING_USE_LOW_PRIORITY: bool = True  # toggle
+
+# ------ GPU (PyTorch) Training Backend ------
+TRAINING_BACKEND: str = "auto"  # backend
+SIMULATION_RUNS_GPU: int = 65536  # simulations
+POPULATION_SIZE_GPU: int = 32  # candidates
+
+# ------ Auto-Tuning Configuration ------
+AUTO_TUNE: bool = False  # toggle
+TARGET_GEN_TIME: float = 0.75  # seconds
+AUTO_TUNE_MIN_RUNS: int = 64  # simulations
+AUTO_TUNE_MAX_RUNS: int = 32768  # simulations
+AUTO_TUNE_PROBE_RUNS: int = 256  # simulations
+AUTO_TUNE_PROBE_RUNS_CPU: int = 32  # simulations
 
 # ------ Curriculum (Adaptive Difficulty) ------
-CURRICULUM_ENABLED: bool = True  # toggle
+CURRICULUM_ENABLED: bool = False  # toggle
 CURRICULUM_DIFFICULTY_RATIO: float = 0.5  # ratio
 CURRICULUM_START_BFS: int = 8  # tiles
 CURRICULUM_BFS_STEP: int = 2  # tiles
 CURRICULUM_BFS_WINDOW: int = 4  # tiles
 CURRICULUM_MAX_BFS: int = 20  # tiles
 CURRICULUM_MAP_ATTEMPTS: int = 10  # attempts
-CURRICULUM_FAILURES_BEFORE_EASE: int = 2  # failures
+CURRICULUM_FAILURES_BEFORE_EASE: int = 2  # regimes
 
 # ------ GUI Element Layout Rectangles ------
 LAYOUT_GRID_RECT: Tuple[int, int, int, int] = (20, 20, 800, 600)  # rect

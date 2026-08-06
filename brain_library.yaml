@@ -1,0 +1,104 @@
+# =============================================================================
+# BRAIN LIBRARY CONFIGURATION REGISTRY
+# =============================================================================
+library:
+  scooterking38:
+    file: "scooterking38_champion.npz"
+    topology:
+      hidden_layers: 2
+      neurons_per_layer: 32
+      memory_frames: 1
+    sensory:
+      vision_rays: 9
+      vision_arc_angle: 120.0
+      include_compass: false
+      include_bfs_sensor: false
+      enable_los_gating: false
+      goal_sensor_max_range: 0.0
+    kinematics:
+      profile_style: "TANK"
+      move_speed: 0.1
+      turn_speed_dpsec: 1080.0
+      player_radius_ratio: 0.5
+    metabolics:
+      collision_damage: 0.005
+      idle_damage: 0.005
+      recovery_ratio: 0.5
+      spin_penalty_enabled: true
+      spin_angle_threshold_deg: 360.0
+      spin_reset_angle_deg: 5.0
+      spin_damage_per_frame: 0.003
+      stagnation_enabled: true
+      stagnation_timeout_ratio: 0.75
+      stagnation_damage_per_frame: 0.001
+
+  herbal1st:
+    file: "herbal1st_champion.npz"
+    topology:
+      hidden_layers: 2
+      neurons_per_layer: 15
+      memory_frames: 1
+    sensory:
+      vision_rays: 19
+      vision_arc_angle: 180.0
+      include_compass: true
+      include_bfs_sensor: false
+      enable_los_gating: false
+      goal_sensor_max_range: 0.0
+    kinematics:
+      profile_style: "TANK"
+      move_speed: 0.1
+      turn_speed_dpsec: 1800.0
+      player_radius_ratio: 0.5
+    metabolics:
+      collision_damage: 0.003
+      idle_damage: 0.001
+      recovery_ratio: 0.05
+      spin_penalty_enabled: true
+      spin_angle_threshold_deg: 360.0
+      spin_reset_angle_deg: 5.0
+      spin_damage_per_frame: 0.003
+      stagnation_enabled: true
+      stagnation_timeout_ratio: 0.75
+      stagnation_damage_per_frame: 0.001
+
+# =============================================================================
+# BRAIN LIBRARY CONFIGURATION LEGEND
+# =============================================================================
+#
+# STRUCTURAL IDENTIFIERS:
+# file:                       The relative path where the candidate's learned
+#                             weights are stored on disk (.npz format).
+#
+# TOPOLOGY PARAMETERS:
+# hidden_layers:              Number of dense MLP hidden layers.
+# neurons_per_layer:          Number of neurons per dense hidden layer.
+# memory_frames:              Number of past sensory frames stacked into the
+#                             input tensor for temporal memory (1 = none).
+#
+# SENSORY PARAMETERS:
+# vision_rays:                Number of probe rays cast across visual arc.
+# vision_arc_angle:           Field of view angle in degrees.
+# include_compass:            Enables stereo target-compass channels (TG-L/R).
+# include_bfs_sensor:         Enables topological step-distance goal sensor.
+# enable_los_gating:          Restricts goal sensors to active line-of-sight.
+# goal_sensor_max_range:      Maximum range radius for goal sensors (0 = inf).
+#
+# KINEMATIC PARAMETERS:
+# profile_style:              Driving profile ("TANK" in-place or "CAR" arc).
+# move_speed:                 Maximum forward translation per tick (tiles).
+# turn_speed_dpsec:           Maximum steering velocity (degrees/sec).
+# player_radius_ratio:        Collision body radius relative to tile size.
+#
+# METABOLIC & HEALTH PARAMETERS:
+# collision_damage:           Health deducted per frame on wall impact.
+# idle_damage:                Health deducted per frame when standing still.
+# recovery_ratio:             Health restored per unit distance closed on exit.
+# spin_penalty_enabled:       Enables cumulative rotation spin penalty.
+# spin_angle_threshold_deg:   Rotation threshold in degrees before spin drain.
+# spin_reset_angle_deg:       Angular delta per tick below which spin resets.
+# spin_damage_per_frame:      Health deducted per frame while over spin limit.
+# stagnation_enabled:         Enables progress timeout stagnation penalty.
+# stagnation_timeout_ratio:   Fraction of max steps allowed without BFS progress.
+# stagnation_damage_per_frame: Health deducted per frame while stagnated.
+# =============================================================================

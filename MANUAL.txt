@@ -6,35 +6,34 @@
    \ \_\ \/`____ \\ `\___/\ \____/\ \_\\ \____\ \_\ \_\ \_\ \_\ \___,_\ \_\\ \____/
     \/_/  `/___/> \`\/__/  \/___/  \/_/ \/____/\/_/\/_/\/_/\/_/\/__,_ /\/_/ \/___/ 
              /\___/                                                                
-             \/__/ 
+             \/__/                                                                 
 ===============================================================================
                      CONFIGURATION MANUAL & FIELD GUIDE
 ===============================================================================
 
+[ACTIVE PROFILE SELECTION]
+-------------------------------------------------------------------------------
+ACTIVE_PROFILE_ID             : Selects the active agent profile key loaded
+                                from brain_library.yaml at engine boot.
+                                Metric: Profile ID string (str).
+
+
 [DISPLAY & GRID LAYOUT]
 -------------------------------------------------------------------------------
-SCREEN_WIDTH                  : Target application display window width.
+SCREEN_WIDTH                  : Target display window width in pixels.
                                 Metric: Pixels (int).
 
-SCREEN_HEIGHT                 : Target application display window height.
+SCREEN_HEIGHT                 : Target display window height in pixels.
                                 Metric: Pixels (int).
 
-FPS                           : Target rendering frame rate and simulation
-                                frame clock speed limit.
+FPS                           : Target rendering frame rate and frame clock
+                                cap for display synchronization.
                                 Metric: Hertz (int).
-
-GRID_ROWS                     : Number of vertical viewports rendered in the
-                                visualizer candidate grid.
-                                Metric: Count (int).
-
-GRID_COLS                     : Number of horizontal viewports rendered in the
-                                visualizer candidate grid.
-                                Metric: Count (int).
 
 
 [WORLD & MAP PARAMETERS]
 -------------------------------------------------------------------------------
-MAP_TYPE                      : Selects procedural level generation style
+MAP_TYPE                      : Selects procedural level generator style
                                 ("BRANCHING WALLS" or "RANDOM").
                                 Metric: Style string (str).
 
@@ -44,150 +43,43 @@ MAP_WIDTH                     : Level grid width in tile units.
 MAP_HEIGHT                    : Level grid height in tile units.
                                 Metric: Tiles (int).
 
-TILE_SIZE                     : Pixel size of a square tile in Player-
-                                Centered tracking mode.
+TILE_SIZE                     : On-screen pixel size of a square tile in
+                                player-centered tracking mode.
                                 Metric: Pixels (int).
 
-WALL_DENSITY                  : Target percentage of inner open area to convert
+WALL_DENSITY                  : Target ratio of inner floor area to convert
                                 into wall obstacles during generation.
                                 Metric: Ratio [0.0 - 1.0] (float).
 
-MAX_MAP_GEN_ATTEMPTS          : Maximum retry attempts to generate a 100%
-                                solvable map layout before fallback.
+MAX_MAP_GEN_ATTEMPTS          : Max generator retry iterations to produce a
+                                100% solvable layout before fallback.
                                 Metric: Attempts (int).
 
-MIN_PATH_DIFFICULTY_RATIO     : Minimum required path difficulty ratio between
-                                start and exit tiles.
+MIN_PATH_DIFFICULTY_RATIO     : Minimum topological BFS step-distance ratio
+                                required between start and exit tiles.
                                 Metric: Ratio [0.0 - 1.0] (float).
-
-
-[SENSORY & VISION ARC]
--------------------------------------------------------------------------------
-VISION_RAYS                   : Number of sensor probe rays cast across the
-                                candidate's vision fan.
-                                Metric: Rays count (int).
-
-VISION_ARC_ANGLE              : Total field-of-view spread angle of the visual
-                                sensor fan.
-                                Metric: Degrees (float).
-
-VISION_MAX_DIST               : Maximum reach distance of vision rays measured
-                                in map tiles.
-                                Metric: Tiles (float).
-
-INCLUDE_COMPASS               : Enables two extra directional target compass
-                                channels (TG-L, TG-R). Disabling forces
-                                agents to navigate using wall rays alone.
-                                Metric: Toggle (bool).
-
-
-[KINEMATICS & PHYSICS]
--------------------------------------------------------------------------------
-KINEMATICS_PROFILE            : Selects driving profile ("CAR" for velocity-
-                                scaled turns or "TANK" for in-place turns
-                                with idle health drain).
-                                Metric: Style string (str).
-
-MOVE_SPEED                    : Maximum forward movement distance per tick.
-                                Metric: Tiles/tick (float).
-
-TURN_SPEED                    : Maximum steering rotation speed.
-                                Metric: Degrees/sec (float).
-
-PLAYER_RADIUS_RATIO           : Scale factor for circular body collision hitbox
-                                relative to tile size.
-                                Metric: Ratio (float).
-
-PLAYER_CAMERA_ZOOM            : Camera zoom scale factor in Player-Centered
-                                tracking mode.
-                                Metric: Scale factor (float).
-
-HEALTH_COLL_DMG_PER_FRAME     : Health deducted per frame while touching or
-                                colliding with wall tiles.
-                                Metric: Damage ratio (float).
-
-HEALTH_IDLE_DMG_PER_FRAME     : Health deducted per frame when standing still
-                                or spinning in place.
-                                Metric: Damage ratio (float).
-
-HEALTH_RECOVERY_RATIO         : Health restored per unit of distance closed on
-                                setting new best exit records.
-                                Metric: Recovery ratio (float).
-
-[ANTI-SPIN & STAGNATION GUARDS]
--------------------------------------------------------------------------------
-SPIN_PENALTY_ENABLED          : Enables the cumulative turn-angle spin penalty
-                                 system. When active, candidates whose
-                                 accumulated rotation exceeds
-                                 SPIN_ANGLE_THRESHOLD_DEG incur per-frame
-                                 damage. The counter resets each frame the
-                                 agent's angular delta falls below
-                                 SPIN_RESET_ANGLE_DEG.
-                                 Metric: Toggle (bool).
-
-SPIN_ANGLE_THRESHOLD_DEG      : Total accumulated absolute rotation in degrees
-                                 a candidate may accrue before spin damage
-                                 begins. The counter resets to zero on any
-                                 frame where the per-step angular delta is
-                                 below SPIN_RESET_ANGLE_DEG.
-                                 Metric: Degrees (float).
-
-SPIN_RESET_ANGLE_DEG          : Per-frame angular delta threshold in degrees.
-                                 If a candidate's turn this frame is below
-                                 this value the spin accumulator resets to
-                                 zero, clearing continuous spin debt for
-                                 agents travelling relatively straight.
-                                 Metric: Degrees (float).
-
-SPIN_DMG_PER_FRAME            : Health deducted per frame once the cumulative
-                                 spin threshold is exceeded.
-                                 Metric: Damage ratio (float).
-
-STAGNATION_ENABLED            : Enables the BFS progress stagnation clock.
-                                 When active, candidates failing to improve
-                                 their best BFS step-distance within the
-                                 stagnation window incur per-frame damage.
-                                 Metric: Toggle (bool).
-
-STAGNATION_TIMEOUT_RATIO      : Fraction of MAX_SIMULATION_STEPS allowed
-                                 without a new record BFS step-distance before
-                                 stagnation drain begins. Scales automatically
-                                 when MAX_SIMULATION_STEPS changes.
-                                 Stagnation limit = int(MAX_SIMULATION_STEPS
-                                 * STAGNATION_TIMEOUT_RATIO).
-                                 Metric: Ratio [0.0 - 1.0] (float).
-
-STAGNATION_DMG_PER_FRAME      : Health deducted per frame once the stagnation
-                                 timeout window is exceeded without a new BFS
-                                 record distance being set.
-                                 Metric: Damage ratio (float).
-
-
-[NEURAL ARCHITECTURE]
--------------------------------------------------------------------------------
-NEURAL_HIDDEN_LAYERS          : Number of dense hidden layers in the MLP
-                                neural network architecture.
-                                Metric: Layers count (int).
-
-NEURAL_NEURONS                : Number of artificial neurons per hidden layer.
-                                Metric: Neurons count (int).
 
 
 [GENETIC ALGORITHM & TRAINING]
 -------------------------------------------------------------------------------
 LEARNING_GENERATIONS          : Total evolutionary generations simulated
-                                during pre-training.
+                                during pre-training execution.
                                 Metric: Generations count (int).
 
+SIMULATION_RUNS               : Total parallel independently-seeded maze
+                                simulation runs per generation.
+                                Metric: Simulations count (int).
+
 POPULATION_SIZE               : Total candidate neural networks evaluated
-                                per generation.
+                                per evolutionary generation.
                                 Metric: Candidates count (int).
 
-MAX_SIMULATION_STEPS          : Maximum frame ticks allowed per candidate run.
+MAX_SIMULATION_STEPS          : Maximum frame steps allowed per candidate
+                                evaluation run.
                                 Metric: Ticks/frames (int).
 
-MAP_REGIME_GENERATIONS        : Maximum generations to train on a single map
-                                layout before rotating maps.
+MAP_REGIME_GENERATIONS        : Max generations to train on a single map
+                                layout before rotating environments.
                                 Metric: Generations count (int).
 
 REGIME_MIN_GENERATIONS        : Minimum generations required on a map before
@@ -198,9 +90,9 @@ REGIME_SOLVE_TARGET           : Minimum successful candidate solvers required
                                 to trigger early map rotation.
                                 Metric: Solvers count (int).
 
-REGIME_TRANSITION_MUTATION_BOOST : Temporary mutation multiplier applied on
-                                transitioning to a new map layout.
-                                Metric: Scale factor (float).
+REGIME_TRANSITION_MUTATION_BOOST : Temporary mutation multiplier applied
+                                    when transitioning to a new map.
+                                    Metric: Scale factor (float).
 
 MAP_DIFFICULTY_MIN            : Minimum sampled path difficulty ratio when
                                 generating random training maps.
@@ -210,34 +102,52 @@ MAP_DIFFICULTY_MAX            : Maximum sampled path difficulty ratio when
                                 generating random training maps.
                                 Metric: Ratio [0.0 - 1.0] (float).
 
-MUTATION_RATE                 : Probability of applying Gaussian mutations to
-                                offspring weights.
+MUTATION_RATE                 : Probability of applying Gaussian weight
+                                mutations to offspring networks.
                                 Metric: Ratio [0.0 - 1.0] (float).
 
 MUTATION_SCALE                : Standard deviation noise scale applied to
-                                weights during mutation.
+                                weights during mutation ops.
                                 Metric: Noise scale (float).
 
-ELITISM_RATIO                 : Ratio of top-scoring candidates preserved
+MUTATION_SCALE_MIN            : Minimum adaptive lower floor cap for
+                                mutation scale adjustments.
+                                Metric: Noise scale (float).
+
+MUTATION_SCALE_MAX            : Maximum adaptive upper ceiling cap for
+                                mutation scale adjustments.
+                                Metric: Noise scale (float).
+
+MUTATION_ADAPT_WINDOW         : Window of generations evaluated for the 1/5
+                                success rule adaptation.
+                                Metric: Generations count (int).
+
+STAGNATION_BUMP_GENERATIONS   : Generations without improvement before a
+                                mutation scale bump triggers.
+                                Metric: Generations count (int).
+
+STAGNATION_BUMP_FACTOR        : Multiplier applied to mutation scale upon
+                                reaching stagnation bump threshold.
+                                Metric: Multiplier factor (float).
+
+ELITISM_RATIO                 : Ratio of top-scoring candidates copied
                                 unchanged into the next generation.
                                 Metric: Ratio [0.0 - 1.0] (float).
 
-DEFAULT_PLAYBACK_SPEED        : Initial playback speed multiplier on booting
-                                the visualizer GUI.
+DEFAULT_PLAYBACK_SPEED        : Initial playback speed multiplier upon
+                                booting visualizer GUI.
                                 Metric: Speed multiplier (int).
 
-SCRUBBER_ARROW_JUMP_FRAMES    : Number of frames skipped per Arrow Left /
-                                 Arrow Right key press during GUI replay
-                                 scrubbing.
-                                 Metric: Frames (int).
-
-DIST_TO_TIME_BONUS_RATIO      : Relative weight multiplier comparing distance
-                                progress to time-saved bonus.
+DIST_TO_TIME_BONUS_RATIO      : Relative weight multiplier comparing
+                                distance progress to frame time bonus.
                                 Metric: Ratio [0.0 - 1.0] (float).
 
-LOST_HP_SCORE_IMPACT_RATIO    : Weighting factor determining how strongly health
-                                loss penalizes fitness score.
+LOST_HP_SCORE_IMPACT_RATIO    : Weighting factor determining how strongly
+                                health loss penalizes final score.
                                 Metric: Ratio [0.0 - 1.0] (float).
+
+RECORDER_MAX_GENERATIONS      : Rolling metrics memory history cap.
+                                Metric: Generations count (int).
 
 
 [PARALLEL SIMULATION]
@@ -246,19 +156,64 @@ SIMULATION_WORKERS            : Number of parallel CPU worker processes for
                                 batch candidate evaluation (0 = auto).
                                 Metric: Workers count (int).
 
+TRAINING_USE_LOW_PRIORITY     : Drops scheduling priority of worker processes
+                                in OS thread scheduler to prevent lag.
+                                Metric: Toggle (bool).
+
+
+[GPU (PYTORCH) TRAINING BACKEND]
+-------------------------------------------------------------------------------
+TRAINING_BACKEND              : Hardware compute backend ("auto", "gpu",
+                                or "cpu").
+                                Metric: Backend string (str).
+
+SIMULATION_RUNS_GPU           : Total parallel simulations per generation
+                                when GPU backend is active.
+                                Metric: Simulations count (int).
+
+POPULATION_SIZE_GPU           : Candidate pool size evaluated per generation
+                                when GPU backend is active.
+                                Metric: Candidates count (int).
+
+
+[AUTO-TUNING CONFIGURATION]
+-------------------------------------------------------------------------------
+AUTO_TUNE                     : Hardware-aware automatic calibration of
+                                training scale parameters at startup.
+                                Metric: Toggle (bool).
+
+TARGET_GEN_TIME               : Target duration in seconds per generation.
+                                Metric: Seconds (float).
+
+AUTO_TUNE_MIN_RUNS            : Absolute lower bound clamp for auto-tuned
+                                simulation run budget.
+                                Metric: Simulations count (int).
+
+AUTO_TUNE_MAX_RUNS            : Absolute upper bound clamp for auto-tuned
+                                simulation run budget.
+                                Metric: Simulations count (int).
+
+AUTO_TUNE_PROBE_RUNS          : Calibration runs used for auto-tuning on
+                                GPU training backend.
+                                Metric: Simulations count (int).
+
+AUTO_TUNE_PROBE_RUNS_CPU      : Calibration runs used for auto-tuning on
+                                CPU training backend.
+                                Metric: Simulations count (int).
+
 
 [CURRICULUM (ADAPTIVE DIFFICULTY)]
 -------------------------------------------------------------------------------
 CURRICULUM_ENABLED            : Activates adaptive difficulty stepping (starts
-                                with easy short paths and scales up).
+                                with short paths and scales up).
                                 Metric: Toggle (bool).
 
-CURRICULUM_DIFFICULTY_RATIO   : Base wall density used during curriculum map
-                                generation.
+CURRICULUM_DIFFICULTY_RATIO   : Base wall density used during curriculum
+                                map generation.
                                 Metric: Ratio [0.0 - 1.0] (float).
 
-CURRICULUM_START_BFS          : Initial target topological path length for early
-                                training stages.
+CURRICULUM_START_BFS          : Initial target topological path length for
+                                early training stages.
                                 Metric: Tiles (int).
 
 CURRICULUM_BFS_STEP           : Path length increase applied upon mastering
@@ -277,27 +232,27 @@ CURRICULUM_MAP_ATTEMPTS       : Retry attempts allowed per regime to match
                                 requested curriculum target distance.
                                 Metric: Attempts (int).
 
-CURRICULUM_FAILURES_BEFORE_EASE : Consecutive unsolved regimes required before
-                                easing curriculum target distance back down.
-                                Metric: Regimes count (int).
+CURRICULUM_FAILURES_BEFORE_EASE : Consecutive unsolved regimes required
+                                  before easing target distance down.
+                                  Metric: Regimes count (int).
 
 
 [GUI ELEMENT LAYOUT RECTANGLES]
 -------------------------------------------------------------------------------
-LAYOUT_GRID_RECT              : Position and size (x, y, width, height) of
+LAYOUT_GRID_RECT              : Position and dimensions (x, y, w, h) of
                                 the candidate grid viewport section.
                                 Metric: Rectangle (int, int, int, int).
 
-LAYOUT_PANEL_RECT             : Position and size (x, y, width, height) of
+LAYOUT_PANEL_RECT             : Position and dimensions (x, y, w, h) of
                                 the telemetry overlay panel.
                                 Metric: Rectangle (int, int, int, int).
 
-LAYOUT_GRAPH_RECT             : Position and size (x, y, width, height) of
-                                the neural network activation graph panel.
+LAYOUT_GRAPH_RECT             : Position and dimensions (x, y, w, h) of
+                                the neural network graph panel.
                                 Metric: Rectangle (int, int, int, int).
 
-LAYOUT_SCRUBBER_RECT          : Position and size (x, y, width, height) of
-                                the interactive transport scrubber panel.
+LAYOUT_SCRUBBER_RECT          : Position and dimensions (x, y, w, h) of
+                                the interactive scrubber panel.
                                 Metric: Rectangle (int, int, int, int).
 
 
@@ -321,14 +276,13 @@ HUD_SCRUBBER_BAR_HEIGHT       : Pixel height for timeline track bars.
 HUD_SCRUBBER_MARKER_RADIUS    : Pixel radius for timeline handle markers.
                                 Metric: Pixels (int).
 
-HUD_GRAPH_NODE_RADIUS         : Pixel radius for neural network graph nodes.
+HUD_GRAPH_NODE_RADIUS         : Pixel radius for neural graph nodes.
                                 Metric: Pixels (int).
 
 HUD_GRAPH_FONT_SIZE           : Font point size for neural graph labels.
                                 Metric: Points (int).
 
-HUD_GRAPH_LABEL_PADDING       : Spacing padding between graph nodes and
-                                text labels.
+HUD_GRAPH_LABEL_PADDING       : Spacing padding between nodes and labels.
                                 Metric: Pixels (int).
 
 
@@ -365,7 +319,7 @@ COLOR_PLAYER_HIGHLIGHT        : Body and frame color for active selected
                                 candidate agent.
                                 Metric: RGB (int, int, int).
 
-COLOR_PLAYER_TEXT             : Text color for candidate facial expressions.
+COLOR_PLAYER_TEXT             : Text color for candidate ASCII faces.
                                 Metric: RGB (int, int, int).
 
 COLOR_VISION_ARC              : Fill color for vision arc fan polygons.
@@ -378,7 +332,7 @@ PLAYER_FACE_TEXT_SCALE        : Scale factor for facial expressions relative
 PLAYER_HEADING_LINE_LENGTH    : Scale factor for forward heading line length.
                                 Metric: Scale factor (float).
 
-PLAYER_HEADING_LINE_WIDTH     : Pixel width for forward heading indicator line.
+PLAYER_HEADING_LINE_WIDTH     : Pixel width for heading indicator line.
                                 Metric: Pixels (int).
 
 COLOR_PLAYER_HEADING_LINE     : Color for forward heading indicator line.
@@ -396,12 +350,12 @@ COLOR_HEALTH_MID              : Health bar color when health is 20% to 50%.
 COLOR_HEALTH_LOW              : Health bar color when health is under 20%.
                                 Metric: RGB (int, int, int).
 
-COLOR_FRAME_SOLVED            : Viewport inset frame color for candidates
-                                that successfully reached the exit tile.
+COLOR_FRAME_SOLVED            : Inset frame color for candidates that
+                                successfully reached the exit tile.
                                 Metric: RGB (int, int, int).
 
-COLOR_FRAME_DEAD              : Viewport inset frame color for candidates
-                                that expired from health depletion.
+COLOR_FRAME_DEAD              : Inset frame color for candidates that
+                                expired from health depletion.
                                 Metric: RGB (int, int, int).
 
 
@@ -417,7 +371,7 @@ COLOR_TIMELINE_BAR            : Background color for timeline track bars.
                                 Metric: RGB (int, int, int).
 
 COLOR_MARKER                  : Color for interactive timeline handle markers.
-                                Metric: RGB (int, int, int).
+                                Metric: Color RGB (int, int, int).
 
 COLOR_BUTTON                  : Default background color for UI buttons.
                                 Metric: RGB (int, int, int).
@@ -428,20 +382,20 @@ COLOR_BUTTON_ACTIVE           : Active/pressed color for UI buttons.
 
 [CANDIDATE FACIAL EXPRESSIONS]
 -------------------------------------------------------------------------------
-FACE_WALK                     : Facial expression string rendered during normal
-                                walking traversal ("o_o").
+FACE_WALK                     : Facial expression string rendered during
+                                normal walking traversal ("o_o").
                                 Metric: Expression string (str).
 
 FACE_WALL                     : Facial expression string rendered during wall
                                 impact collisions (">*<").
                                 Metric: Expression string (str).
 
-FACE_DEAD                     : Facial expression string rendered when health
-                                drops to zero ("T_T").
+FACE_DEAD                     : Facial expression string rendered when
+                                health drops to zero ("T_T").
                                 Metric: Expression string (str).
 
-FACE_EXIT                     : Facial expression string rendered when candidate
-                                reaches the exit ("^*^").
+FACE_EXIT                     : Facial expression string rendered when
+                                candidate reaches the exit ("^*^").
                                 Metric: Expression string (str).
 
 ===============================================================================
