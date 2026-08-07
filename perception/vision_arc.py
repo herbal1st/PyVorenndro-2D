@@ -1,5 +1,5 @@
 """
-Grid-aligned DDA raycaster for wall proximity sensing.
+Grid-aligned DDA raycaster for wall proximity and global target sensing.
 """
 
 import math
@@ -13,7 +13,7 @@ from core.map_data import MapData
 
 class VisionArcSampler:
     """
-    Casts probe rays measuring wall tile proximity across visual arc.
+    Casts probe rays measuring wall tile proximity and global target visibility across visual arc.
     """
 
     def __init__(
@@ -37,48 +37,26 @@ class VisionArcSampler:
         else:
             self.relative_angles = [0.0]
 
-    def sample_vision_channels(
-        self,
-        origin_x: float,
-        origin_y: float,
-        heading_rad: float,
-        map_data: MapData
-    ) -> NDArray[np.float32]:
-        """
-        Casts probe rays and returns a (VISION_RAYS,) wall proximity array.
-        """
-        channels: NDArray[np.float32] = np.zeros(
-            self.num_rays, dtype=np.float32
-        )
-
-        for i, rel_angle in enumerate(self.relative_angles):
-            ray_angle: float = heading_rad + rel_angle
-            wall_prox, _ = self._cast_single_ray(
-                origin_x, origin_y, ray_angle, map_data
-            )
-            channels[i] = wall_prox
-
-        return channels
-
-    def sample_vision_channels_batch(
+    def extract_features_batch(
         self,
         xs: NDArray[np.float64],
         ys: NDArray[np.float64],
         headings: NDArray[np.float64],
-        map_data: MapData,
-        wall_grid: Optional[NDArray[np.bool_]] = None
+        speeds: NDArray[np.float64],
+        healths: NDArray[np.float64],
+        wall_grid: NDArray[np.bool_],
+        exit_pos: Tuple[int, int]
     ) -> NDArray[np.float32]:
         """
-        Vectorized Amanatides-Woo DDA across (N,) origins and headings.
-        Returns a (N, VISION_RAYS) float32 wall proximity array.
+        Extracts vectorized observation features: wall proximity array + single global target flag.
+        Returns a (N, VISION_RAYS + 1) float32 array.
         """
         n_cands: int = int(xs.shape[0])
         if n_cands == 0:
-            return np.zeros((0, self.num_rays), dtype=np.float32)
+            return np.zeros((0, self.num_rays + 1), dtype=np.float32)
 
-        if wall_grid is None:
-            wall_grid = map_data.build_wall_grid()
         h, w = wall_grid.shape
+        ex, ey = exit_pos
 
         offsets: NDArray[np.float64] = np.asarray(
             self.relative_angles, dtype=np.float64
@@ -93,18 +71,23 @@ class VisionArcSampler:
         tile_x: NDArray[np.int64] = np.floor(ox).astype(np.int64)
         tile_y: NDArray[np.int64] = np.floor(oy).astype(np.int64)
 
-        n_rays: int = int(ox.shape[0])
-        prox: NDArray[np.float64] = np.zeros(n_rays, dtype=np.float64)
-        done: NDArray[np.bool_] = np.zeros(n_rays, dtype=np.bool_)
+        n_rays_total: int = int(ox.shape[0])
+        prox: NDArray[np.float64] = np.zeros(n_rays_total, dtype=np.float64)
+        done: NDArray[np.bool_] = np.zeros(n_rays_total, dtype=np.bool_)
+        target_spotted: NDArray[np.bool_] = np.zeros(n_rays_total, dtype=np.bool_)
 
         inb: NDArray[np.bool_] = (
             (tile_x >= 0) & (tile_x < w) & (tile_y >= 0) & (tile_y < h)
         )
         txc: NDArray[np.int64] = np.clip(tile_x, 0, w - 1)
         tyc: NDArray[np.int64] = np.clip(tile_y, 0, h - 1)
+        
         inside_wall: NDArray[np.bool_] = inb & wall_grid[tyc, txc]
         prox[inside_wall] = 1.0
         done[inside_wall] = True
+
+        inside_target: NDArray[np.bool_] = inb & (txc == ex) & (tyc == ey)
+        target_spotted[inside_target] = True
 
         step_x: NDArray[np.int64] = np.where(
             dir_x > 0.0, 1, np.where(dir_x < 0.0, -1, 0)
@@ -155,17 +138,55 @@ class VisionArcSampler:
             )
             txc = np.clip(tile_x, 0, w - 1)
             tyc = np.clip(tile_y, 0, h - 1)
+            
             wall_hit: NDArray[np.bool_] = inb & wall_grid[tyc, txc]
-            blocked: NDArray[np.bool_] = active & ~no_hit & (wall_hit | ~inb)
+            target_hit: NDArray[np.bool_] = inb & (txc == ex) & (tyc == ey)
+            
+            target_spotted |= active & ~no_hit & target_hit
+
+            blocked: NDArray[np.bool_] = active & ~no_hit & (wall_hit | target_hit | ~inb)
             prox = np.where(
-                blocked,
+                blocked & wall_hit,
                 np.clip(1.0 - (hit_t / max_t), 0.0, 1.0),
                 prox,
             )
             done |= blocked
 
         prox[~done] = 0.0
-        return prox.reshape(n_cands, self.num_rays).astype(np.float32)
+        
+        # Reshape prox to (n_cands, self.num_rays)
+        prox_matrix = prox.reshape(n_cands, self.num_rays)
+        target_matrix = target_spotted.reshape(n_cands, self.num_rays)
+        
+        # Compute global boolean flag across any ray per candidate: (n_cands, 1)
+        global_target_flag = np.any(target_matrix, axis=1, keepdims=True).astype(np.float32)
+        
+        # Concatenate wall proximities and global target flag into (n_cands, num_rays + 1)
+        features = np.hstack((prox_matrix, global_target_flag))
+        return features.astype(np.float32)
+
+    def sample_vision_channels(
+        self,
+        origin_x: float,
+        origin_y: float,
+        heading_rad: float,
+        map_data: MapData
+    ) -> NDArray[np.float32]:
+        """
+        Casts probe rays and returns wall proximity array.
+        """
+        channels: NDArray[np.float32] = np.zeros(
+            self.num_rays, dtype=np.float32
+        )
+
+        for i, rel_angle in enumerate(self.relative_angles):
+            ray_angle: float = heading_rad + rel_angle
+            wall_prox, _ = self._cast_single_ray(
+                origin_x, origin_y, ray_angle, map_data
+            )
+            channels[i] = wall_prox
+
+        return channels
 
     def _cast_single_ray(
         self,

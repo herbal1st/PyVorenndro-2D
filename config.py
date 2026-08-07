@@ -1,80 +1,81 @@
 """
 Global configuration settings for PyVorenndro 2D engine.
-Optimized for random, dynamic map generation with pure visual raycasting (No Compass).
+Optimized for random, dynamic map generation with pure visual raycasting and a global target toggle.
 Tuned for maximum CPU execution speed with Numba JIT compilation.
 """
 
 from typing import Tuple
 
 # ------ Display & Grid Layout ------
-SCREEN_WIDTH: int = 1280  # pixels
-SCREEN_HEIGHT: int = 720  # pixels
-FPS: int = 60  # hertz
-GRID_ROWS: int = 4  # count
-GRID_COLS: int = 4  # count
+SCREEN_WIDTH: int = 1280   # pixels
+SCREEN_HEIGHT: int = 720   # pixels
+FPS: int = 60   # hertz
+GRID_ROWS: int = 4   # count
+GRID_COLS: int = 4   # count
 
 # ------ World & Map Parameters ------
-MAP_TYPE: str = "BRANCHING WALLS"  # style
-MAP_WIDTH: int = 12  # tiles
-MAP_HEIGHT: int = 9  # tiles
-TILE_SIZE: int = 24  # pixels
-WALL_DENSITY: float = 0.35  # ratio
-MAX_MAP_GEN_ATTEMPTS: int = 150  # attempts
-MIN_PATH_DIFFICULTY_RATIO: float = 0.40  # ratio
+MAP_TYPE: str = "BRANCHING WALLS"   # style
+MAP_WIDTH: int = 12   # tiles
+MAP_HEIGHT: int = 9   # tiles
+TILE_SIZE: int = 24   # pixels
+WALL_DENSITY: float = 0.35   # ratio
+MAX_MAP_GEN_ATTEMPTS: int = 150   # attempts
+MIN_PATH_DIFFICULTY_RATIO: float = 0.40   # ratio
 
 # ------ Sensory & Vision Arc (NO COMPASS, NUMBA-OPTIMIZED) ------
-VISION_RAYS: int = 9  # 9 rays across 120° field of view
-VISION_ARC_ANGLE: float = 120.0  # degrees
-VISION_MAX_DIST: float = 6.0  # tiles
-INCLUDE_COMPASS: bool = False  # Pure visual raycasting navigation
+VISION_RAYS: int = 9   # 9 rays across 120° field of view
+VISION_ARC_ANGLE: float = 120.0   # degrees
+VISION_MAX_DIST: float = 6.0   # tiles
+INCLUDE_COMPASS: bool = False   # Pure visual raycasting navigation
 
-# ------ Kinematics & Health Tuning (FAST CULLING) ------
-KINEMATICS_PROFILE: str = "TANK"  # style
-MOVE_SPEED: float = 0.15  # tiles
-TURN_SPEED: float = 1800.0  # dpsec
-PLAYER_RADIUS_RATIO: float = 0.45  # ratio
-PLAYER_CAMERA_ZOOM: float = 0.5  # scale
-HEALTH_COLL_DMG_PER_FRAME: float = 0.012  # Kills wall-hugging agents quickly
-HEALTH_IDLE_DMG_PER_FRAME: float = 0.004  # Quickly terminates non-moving agents
-HEALTH_IDLE_MOVE_THRESHOLD: float = 0.005  # ratio
-HEALTH_RECOVERY_RATIO: float = 0.05  # ratio
+# ------ Kinematics & Health Tuning (REDUCED CULLING AGGRESSIVENESS) ------
+KINEMATICS_PROFILE: str = "TANK"   # style
+MOVE_SPEED: float = 0.15   # tiles
+TURN_SPEED: float = 1800.0   # dpsec
+PLAYER_RADIUS_RATIO: float = 0.45   # ratio
+PLAYER_CAMERA_ZOOM: float = 0.5   # scale
+HEALTH_COLL_DMG_PER_FRAME: float = 0.008   # Smoother penalty to give agents time to learn steering
+HEALTH_IDLE_DMG_PER_FRAME: float = 0.002   # Balanced idle termination rate
+HEALTH_IDLE_MOVE_THRESHOLD: float = 0.005   # ratio
+HEALTH_RECOVERY_RATIO: float = 0.05   # ratio
 
 # ------ Anti-Spin & Stagnation Guards ------
-SPIN_PENALTY_ENABLED: bool = True  # toggle
-SPIN_ANGLE_THRESHOLD_DEG: float = 360.0  # degrees
-SPIN_RESET_ANGLE_DEG: float = 5.0  # degrees
-SPIN_DMG_PER_FRAME: float = 0.012  # Fast culling on spinning agents
-STAGNATION_ENABLED: bool = True  # toggle
-STAGNATION_TIMEOUT_RATIO: float = 0.30  # Times out stuck agents after ~240 ticks
-STAGNATION_DMG_PER_FRAME: float = 0.015  # Rapid culling in dead ends
+SPIN_PENALTY_ENABLED: bool = True   # toggle
+SPIN_ANGLE_THRESHOLD_DEG: float = 360.0   # degrees
+SPIN_RESET_ANGLE_DEG: float = 5.0   # degrees
+SPIN_DMG_PER_FRAME: float = 0.008   # Balanced culling on spinning agents
+STAGNATION_ENABLED: bool = True   # toggle
+STAGNATION_TIMEOUT_RATIO: float = 0.30   # Times out stuck agents after ~240 ticks
+STAGNATION_DMG_PER_FRAME: float = 0.010   # Balanced culling in dead ends
 
 # ------ Neural Architecture ------
-NEURAL_HIDDEN_LAYERS: int = 1  # layers
-NEURAL_NEURONS: int = 12  # Compact hidden layer for ultra-fast vector dot products
+NEURAL_HIDDEN_LAYERS: int = 1   # layers
+NEURAL_NEURONS: int = 12   # Compact hidden layer for ultra-fast vector dot products
+NEURAL_INPUT_SIZE: int = VISION_RAYS + 1  # 9 ray distances + 1 global target toggle indicator
 
-# ------ Genetic Algorithm & Training ------
-LEARNING_GENERATIONS: int = 350  # generations
-POPULATION_SIZE: int = 100  # candidates
-MAX_SIMULATION_STEPS: int = 800  # Step cap
-MAP_REGIME_GENERATIONS: int = 1  # Generates a new map every generation
-REGIME_MIN_GENERATIONS: int = 1  # generations
-REGIME_SOLVE_TARGET: int = 1  # solvers
-REGIME_TRANSITION_MUTATION_BOOST: float = 1.0  # scale
-MAP_DIFFICULTY_MIN: float = 0.40  # ratio
-MAP_DIFFICULTY_MAX: float = 0.85  # ratio
-MUTATION_RATE: float = 0.10  # ratio
-MUTATION_SCALE: float = 0.08  # scale
-ELITISM_RATIO: float = 0.20  # Preserves top generalist visual controllers
-DEFAULT_PLAYBACK_SPEED: int = 1  # multiplier
-SCRUBBER_ARROW_JUMP_FRAMES: int = 25  # frames
-SCRUBBER_PAGE_JUMP_GENS: int = 1  # generations
-DIST_TO_TIME_BONUS_RATIO: float = 1.2  # ratio
-LOST_HP_SCORE_IMPACT_RATIO: float = 0.6  # ratio
+# ------ Genetic Algorithm & Training (BALANCED MUTATION & LARGER POOL) ------
+LEARNING_GENERATIONS: int = 350   # generations
+POPULATION_SIZE: int = 150   # Increased gene pool for better diversity and local minima escape
+MAX_SIMULATION_STEPS: int = 800   # Step cap
+MAP_REGIME_GENERATIONS: int = 1   # Generates a new map every generation
+REGIME_MIN_GENERATIONS: int = 1   # generations
+REGIME_SOLVE_TARGET: int = 1   # solvers
+REGIME_TRANSITION_MUTATION_BOOST: float = 1.0   # scale
+MAP_DIFFICULTY_MIN: float = 0.40   # ratio
+MAP_DIFFICULTY_MAX: float = 0.85   # ratio
+MUTATION_RATE: float = 0.08   # Slightly reduced to protect high-performing gene structures
+MUTATION_SCALE: float = 0.05   # Reduced to prevent catastrophic regression in top generations
+ELITISM_RATIO: float = 0.20   # Preserves top generalist visual controllers
+DEFAULT_PLAYBACK_SPEED: int = 1   # multiplier
+SCRUBBER_ARROW_JUMP_FRAMES: int = 25   # frames
+SCRUBBER_PAGE_JUMP_GENS: int = 1   # generations
+DIST_TO_TIME_BONUS_RATIO: float = 1.2   # ratio
+LOST_HP_SCORE_IMPACT_RATIO: float = 0.6   # ratio
 
 # ------ Parallel Simulation ------
-SIMULATION_WORKERS: int = 4  # Parallel worker processes
+SIMULATION_WORKERS: int = 4   # Parallel worker processes
 
-# ------ Curriculum (Disabled) ------
+# ------ Curriculum (Disabled per user instructions) ------
 CURRICULUM_ENABLED: bool = False
 CURRICULUM_DIFFICULTY_RATIO: float = 0.5
 CURRICULUM_START_BFS: int = 4
