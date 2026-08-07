@@ -30,6 +30,15 @@ FPS                           : Target rendering frame rate and frame clock
                                 cap for display synchronization.
                                 Metric: Hertz (int).
 
+VIEWPORT_GRID_ROWS            : Number of grid viewport rows in multi-window
+                                mode. Metric: Rows count (int).
+
+VIEWPORT_GRID_COLS            : Number of grid viewport columns in multi-
+                                window mode. Metric: Columns count (int).
+
+WINNER_CELEBRATION_FRAMES     : Frame buffer duration to celebrate maze solve
+                                at exit tile. Metric: Frames count (int).
+
 
 [WORLD & MAP PARAMETERS]
 -------------------------------------------------------------------------------
@@ -63,16 +72,20 @@ MIN_PATH_DIFFICULTY_RATIO     : Minimum topological BFS step-distance ratio
 [GENETIC ALGORITHM & TRAINING]
 -------------------------------------------------------------------------------
 LEARNING_GENERATIONS          : Total evolutionary generations simulated
-                                during pre-training execution.
+                                during execution.
                                 Metric: Generations count (int).
-
-SIMULATION_RUNS               : Total parallel independently-seeded maze
-                                simulation runs per generation.
-                                Metric: Simulations count (int).
 
 POPULATION_SIZE               : Total candidate neural networks evaluated
                                 per evolutionary generation.
                                 Metric: Candidates count (int).
+
+MAPS_PER_CANDIDATE            : Number of independently-seeded procedural mazes
+                                evaluated per candidate genome.
+                                Metric: Mazes count (int).
+
+SIMULATION_RUNS               : Total parallel simulation runs per generation
+                                (POPULATION_SIZE * MAPS_PER_CANDIDATE).
+                                Metric: Simulations count (int).
 
 MAX_SIMULATION_STEPS          : Maximum frame steps allowed per candidate
                                 evaluation run.
@@ -166,14 +179,6 @@ TRAINING_USE_LOW_PRIORITY     : Drops scheduling priority of worker processes
 TRAINING_BACKEND              : Hardware compute backend ("auto", "gpu",
                                 or "cpu").
                                 Metric: Backend string (str).
-
-SIMULATION_RUNS_GPU           : Total parallel simulations per generation
-                                when GPU backend is active.
-                                Metric: Simulations count (int).
-
-POPULATION_SIZE_GPU           : Candidate pool size evaluated per generation
-                                when GPU backend is active.
-                                Metric: Candidates count (int).
 
 
 [AUTO-TUNING CONFIGURATION]

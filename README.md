@@ -1,4 +1,3 @@
-```text
  ____           __  __                                          __                 
 /\  _`\        /\ \/\ \                                        /\ \                
 \ \ \L\ \__  __\ \ \ \ \    ___   _ __    __    ___     ___    \_\ \  _ __   ___   
@@ -22,8 +21,8 @@ Architecture   : High-performance 2D Neuroevolution Engine built with pure
                  PyBiwis 64-bit bitmask grid compression, vectorized DDA
                  raycasting, continuous Circle-to-AABB smooth wall physics,
                  dual kinematics steering profiles (Car and Tank), adaptive
-                 curriculum training, hardware auto-tuning, and low-priority
-                 process scheduling.
+                 curriculum training, hardware auto-tuning, low-priority
+                 process scheduling, and deadlock-free binary IPC streams.
 Primary Goal   : Train autonomous candidate agents to navigate procedural
                  labyrinths from randomized start locations to exit tiles
                  using multi-ray visual probe fans, target compass guidance,
@@ -31,9 +30,9 @@ Primary Goal   : Train autonomous candidate agents to navigate procedural
                  indicator feedback channels.
 Presentation   : Interactive GUI featuring dual camera tracking modes (Map-
                  Centered and Player-Centered), 16x turbo speed controls,
-                 dual-bar scrubber transport, pre-rendered background surface
-                 caching, standardized 0-1000 score normalization, real-time
-                 neural activation graphs, and an 8-column CLI console table.
+                 dual-bar scrubber transport with progress fill, instant solve
+                 ticks, celebration frames, standardized 0-1000 score
+                 scaling, neural activation graphs, and an 8-column CLI table.
 
 
 [2.0 SINGLE-AGENT CHAMPION PARADIGM & MAZE GENERALIZATION]
@@ -85,7 +84,7 @@ Vision Fan     : Configurable probe rays (e.g. 9 to 21 rays) distributed
                  proximity to walls (0.0 for open space to 1.0 for point-blank
                  wall collision).
 Proprioception : 2 physical status channels:
-                 - Speed Channel (SPD): Current forward translation speed.
+                 - Speed Channel (SPD): Current velocity / max speed ratio [0, 1].
                  - Health Channel (HP): Active candidate health ratio [0, 1].
 Damage Inputs  : 3 dedicated penalty indicator channels:
                  - Collision Flag (HIT): 1.0 on wall impact (0.0 otherwise).
@@ -148,7 +147,7 @@ Expressive UI   : Facial ASCII states map directly to physics events:
                   - FACE_EXIT : Successfully reached exit tile ("^*^").
 
 
-[7.0 DUAL COMPUTE BACKENDS (CPU NUMPY & GPU PYTORCH)]
+[7.0 DUAL COMPUTE BACKENDS & DEADLOCK-FREE BINARY IPC]
 -------------------------------------------------------------------------------
 CPU Backend    : Multi-candidate vectorized NumPy batch engine executing
                  all candidates and mazes in unified tensor operations,
@@ -159,6 +158,9 @@ GPU Backend    : PyTorch CUDA engine ('GpuHeadlessTrainer') evaluating thousands
                  CPU map prefetching pool.
 Auto Fallback  : If PyTorch or CUDA hardware is unavailable, the trainer
                  automatically reverts to the optimized CPU NumPy engine.
+Binary IPC     : Shared state serialization uses binary byte streams ('pickle')
+                 between trainer and GUI processes, eliminating list proxy
+                 socket deadlocks and ensuring instant frame-1 boot times.
 
 
 [8.0 HARDWARE AUTO-TUNING & PROCESS SCHEDULING]
@@ -184,18 +186,25 @@ Process Split  : The headless trainer runs inside a background worker process,
                  runner re-simulates the champion live at human playback speed
                  on a single viewport at 60 FPS.
 Pre-Rendered   : Pre-renders static level geography into a single background
-                 image per run, reducing tile draw calls to fast surface copies.
+                 image per run using unique map memory IDs, eliminating surface
+                 cache collisions across generations.
 Alpha Scratchpad: Reuses a single pre-allocated transparent Surface for vision
                  arc fan polygons and heading lines, preventing memory churn.
 Dual Camera    : ENTER key toggle switches between:
                  - Map-Centered Mode: Fits entire level into viewport.
                  - Player-Centered Mode: Locks agent to center with SDL
                    clipping masks.
-Interactive UI : Transport controls with PLAY/PAUSE, REP ALL / REP 1 loop
+Grid Layout    : Configurable via 'VIEWPORT_GRID_ROWS' and 'VIEWPORT_GRID_COLS'
+                 in config.py for multi-candidate window layouts.
+Interactive UI : Transport controls with PLAY/PAUSE, REP ALL / REP GEN loop
                  toggle, speed controls (1x to 16x Turbo), and timeline
                  scrubbing for frame steps and generations.
+Celebration    : Includes 'WINNER_CELEBRATION_FRAMES' (60 frames / 1s) where
+                 agents celebrate at exit ('^*^') before transitioning.
+Solve Ticks    : Frame progress bar renders immediate pre-calculated solve
+                 finish tick marks as soon as an episode starts.
 Telemetry HUD  : Overlay panel displaying active run step count, generation,
-                 top scores, average scores, and winner callouts.
+                 agent ID, top scores, average scores, and winner callouts.
 Activation Graph: Real-time neural activation graph rendering node layer
                  intensities with dark-red-to-orange color shifts and input
                  channel shorthand labels (-60°..+60°, TG-L, TG-R, SPD, HP,
@@ -225,6 +234,7 @@ Launch         : python main.py
                    per-generation CLI table, auto-saves champion weights to
                    'champions/', and renders the live re-simulation GUI.
 GUI Controls   : 
+                 - TAB           : Toggle Single-Window Full View vs Multi-Window Grid.
                  - ENTER         : Toggle camera (Map-Centered / Player-Centered).
                  - ESC           : Close visualizer GUI and terminate trainer.
                  - SPACE         : Toggle Play/Pause transport.
