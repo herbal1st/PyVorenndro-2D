@@ -3,7 +3,7 @@
 \ \ \L\ \__  __\ \ \ \ \    ___   _ __    __    ___     ___    \_\ \  _ __   ___   
  \ \ ,__/\ \/\ \\ \ \ \ \  / __`\/\`'__\/'__`\/' _ `\ /' _ `\  /'_` \/\`'__\/ __`\ 
   \ \ \/\ \ \_\ \\ \ \_/ \/\ \L\ \ \ \//\  __//\ \/\ \/\ \/\ \/\ \L\ \ \ \//\ \L\ \
-   \ \_\ \/`____ \\ `\___/\ \____/\ \_\\ \____\ \_\ \_\ \_\ \_\ \___,_\ \_\\ \____/
+   \ \_\ \/`____ \\ `\___/\ \____/\ \_\\ \____\ \_\ \_\ \_\ \___,_\ \_\\ \____/
     \/_/  `/___/> \`\/__/  \/___/  \/_/ \/____/\/_/\/_/\/_/\/_/\/__,_ /\/_/ \/___/ 
              /\___/                                                                
              \/__/                                                                 
@@ -18,11 +18,12 @@ Architecture   : High-performance 2D Neuroevolution Engine built with pure
                  Python, NumPy, Pygame, and optional PyTorch CUDA support.
                  Features a Single-Agent Champion evolutionary strategy,
                  data-driven YAML profiles, persistent champion weights,
-                 PyBiwis 64-bit bitmask grid compression, vectorized DDA
-                 raycasting, continuous Circle-to-AABB smooth wall physics,
-                 dual kinematics steering profiles (Car and Tank), adaptive
-                 curriculum training, hardware auto-tuning, low-priority
-                 process scheduling, and deadlock-free binary IPC streams.
+                 PyBiwis 64-bit bitmask grid compression, native NumPy
+                 C-contiguous boolean array grids, fast Amanatides-Woo
+                 vectorized DDA raycasting, continuous Circle-to-AABB smooth
+                 wall physics, dual kinematics steering profiles (Car and
+                 Tank), hardware auto-tuning, modular IPC state bridges,
+                 and window branding support (`icon.png`).
 Primary Goal   : Train autonomous candidate agents to navigate procedural
                  labyrinths from randomized start locations to exit tiles
                  using multi-ray visual probe fans, target compass guidance,
@@ -31,8 +32,9 @@ Primary Goal   : Train autonomous candidate agents to navigate procedural
 Presentation   : Interactive GUI featuring dual camera tracking modes (Map-
                  Centered and Player-Centered), 16x turbo speed controls,
                  dual-bar scrubber transport with progress fill, instant solve
-                 ticks, celebration frames, standardized 0-1000 score
-                 scaling, neural activation graphs, and an 8-column CLI table.
+                 ticks, celebration transition frames, standardized 0-1000
+                 score scaling, neural activation graphs, and an 8-column
+                 CLI progress table.
 
 
 [2.0 SINGLE-AGENT CHAMPION PARADIGM & MAZE GENERALIZATION]
@@ -45,8 +47,16 @@ Single Champion: Rather than training a large pool of distinct agents on a
 Generalization : An agent cannot memorize or "cheat" on a single maze layout.
                  Its fitness score is the average performance across all
                  evaluated mazes, encouraging true spatial navigation logic.
-Grid Storage   : Rectangular tile grids (MAP_WIDTH x MAP_HEIGHT) stored in
-                 C-contiguous NumPy arrays for instant vectorized lookups.
+Native Grids   : Rectangular tile grids (MAP_WIDTH x MAP_HEIGHT) stored in
+                 C-contiguous boolean NumPy arrays (`np.ndarray`) for fast
+                 lookups and zero Python Garbage Collection (GC) overhead.
+Unique Map ID  : Every generated maze receives a unique integer ID (`map_id`),
+                 guaranteeing clean visual texture rendering in Pygame without
+                 memory cache collisions or visual ghosting.
+Decoupled Maps : Map generation is decoupled into `TrainingMapPipeline` (for
+                 high-throughput batch training) and `DisplayMapFactory`
+                 (which generates fresh, unseen control-check mazes for the
+                 visualizer to verify spatial generalization).
 PyBiwis Chunks : Packed 64-bit integer words storing wall collision layouts,
                  compressing tile maps into tiny save snapshots.
 100% Floor Fill: All level generators use flood-fill analysis to guarantee
@@ -147,20 +157,22 @@ Expressive UI   : Facial ASCII states map directly to physics events:
                   - FACE_EXIT : Successfully reached exit tile ("^*^").
 
 
-[7.0 DUAL COMPUTE BACKENDS & DEADLOCK-FREE BINARY IPC]
+[7.0 DUAL COMPUTE BACKENDS & MODULAR TRAINER ARCHITECTURE]
 -------------------------------------------------------------------------------
-CPU Backend    : Multi-candidate vectorized NumPy batch engine executing
-                 all candidates and mazes in unified tensor operations,
-                 delivering fast generation times (~0.2s - 0.5s per gen).
-GPU Backend    : PyTorch CUDA engine ('GpuHeadlessTrainer') evaluating thousands
-                 of parallel maze simulations simultaneously as batched CUDA
-                 tensors in GPU VRAM, paired with an asynchronous multi-core
-                 CPU map prefetching pool.
-Auto Fallback  : If PyTorch or CUDA hardware is unavailable, the trainer
-                 automatically reverts to the optimized CPU NumPy engine.
-Binary IPC     : Shared state serialization uses binary byte streams ('pickle')
-                 between trainer and GUI processes, eliminating list proxy
-                 socket deadlocks and ensuring instant frame-1 boot times.
+Base Trainer   : `BaseTrainer` in `training/base_trainer.py` owns the genetic
+                 algorithm, population mutation strategy (1/5th success rule),
+                 stagnation bumps, IPC state publishing, and training loop.
+CPU Physics    : `CpuSimulator` in `training/cpu_simulator.py` executes
+                 candidate matrix operations in pure NumPy, separating physics
+                 simulation from genetic algorithm strategy.
+GPU Backend    : `GpuHeadlessTrainer` in `training/trainer_gpu.py` evaluates
+                 candidates as batched CUDA tensors in GPU VRAM, paired with
+                 an asynchronous multi-core CPU map prefetching pool.
+Auto Fallback  : If PyTorch or CUDA hardware is unavailable, the system
+                 reverts seamlessly to the optimized CPU NumPy engine.
+Trainer Bridge : `TrainerBridge` in `display/trainer_bridge.py` handles thread-
+                 safe state deserialization (`pickle`), polling metrics, and
+                 fetching champion genomes from shared memory.
 
 
 [8.0 HARDWARE AUTO-TUNING & PROCESS SCHEDULING]
@@ -185,11 +197,19 @@ Process Split  : The headless trainer runs inside a background worker process,
                  publishing champion weights to shared memory. The display
                  runner re-simulates the champion live at human playback speed
                  on a single viewport at 60 FPS.
-Pre-Rendered   : Pre-renders static level geography into a single background
-                 image per run using unique map memory IDs, eliminating surface
-                 cache collisions across generations.
-Alpha Scratchpad: Reuses a single pre-allocated transparent Surface for vision
-                 arc fan polygons and heading lines, preventing memory churn.
+Display Runner : `DisplayRunner` in `display/runner.py` acts as the primary
+                 window orchestrator. Automatically loads `icon.png` from the
+                 root directory for window branding.
+Event Handler  : `DisplayEventHandler` in `display/event_handler.py` isolates
+                 user input processing (keyboard shortcuts, mouse clicks,
+                 scrubber dragging, camera mode toggles).
+Episode Runner : `Episode` in `display/episode.py` runs single-agent human-speed
+                 re-simulations, logging frame history for playback.
+Pre-Rendered   : Pre-renders static level geography into a background surface
+                 cached via `map_data.map_id`, completely eliminating visual
+                 ghosting and surface cache collisions across generations.
+Alpha Scratchpad: Reuses a pre-allocated transparent Surface for vision arc
+                 fan polygons and heading lines, preventing memory churn.
 Dual Camera    : ENTER key toggle switches between:
                  - Map-Centered Mode: Fits entire level into viewport.
                  - Player-Centered Mode: Locks agent to center with SDL
