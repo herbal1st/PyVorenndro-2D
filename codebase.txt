@@ -1,0 +1,4448 @@
+
+--- FILE: ./MANUAL.txt ---
+ ____           __  __                                          __                 
+/\  _`\        /\ \/\ \                                        /\ \                
+\ \ \L\ \__  __\ \ \ \ \    ___   _ __    __    ___     ___    \_\ \  _ __   ___   
+ \ \ ,__/\ \/\ \\ \ \ \ \  / __`\/\`'__\/'__`\/' _ `\ /' _ `\  /'_` \/\`'__\/ __`\ 
+  \ \ \/\ \ \_\ \\ \ \_/ \/\ \L\ \ \ \//\  __//\ \/\ \/\ \/\ \/\ \L\ \ \ \//\ \L\ \
+   \ \_\ \/`____ \\ `\___/\ \____/\ \_\\ \____\ \_\ \_\ \_\ \_\ \___,_\ \_\\ \____/
+    \/_/  `/___/> \`\/__/  \/___/  \/_/ \/____/\/_/\/_/\/_/\/_/\/__,_ /\/_/ \/___/ 
+             /\___/                                                                
+             \/__/ 
+===============================================================================
+                     CONFIGURATION MANUAL & FIELD GUIDE
+===============================================================================
+
+[DISPLAY & GRID LAYOUT]
+-------------------------------------------------------------------------------
+SCREEN_WIDTH                  : Target application display window width.
+                                Metric: Pixels (int).
+
+SCREEN_HEIGHT                 : Target application display window height.
+                                Metric: Pixels (int).
+
+FPS                           : Target rendering frame rate and simulation
+                                frame clock speed limit.
+                                Metric: Hertz (int).
+
+GRID_ROWS                     : Number of vertical viewports rendered in the
+                                visualizer candidate grid.
+                                Metric: Count (int).
+
+GRID_COLS                     : Number of horizontal viewports rendered in the
+                                visualizer candidate grid.
+                                Metric: Count (int).
+
+
+[WORLD & MAP PARAMETERS]
+-------------------------------------------------------------------------------
+MAP_TYPE                      : Selects procedural level generation style
+                                ("BRANCHING WALLS" or "RANDOM").
+                                Metric: Style string (str).
+
+MAP_WIDTH                     : Level grid width in tile units.
+                                Metric: Tiles (int).
+
+MAP_HEIGHT                    : Level grid height in tile units.
+                                Metric: Tiles (int).
+
+TILE_SIZE                     : Pixel size of a square tile in Player-
+                                Centered tracking mode.
+                                Metric: Pixels (int).
+
+WALL_DENSITY                  : Target percentage of inner open area to convert
+                                into wall obstacles during generation.
+                                Metric: Ratio [0.0 - 1.0] (float).
+
+MAX_MAP_GEN_ATTEMPTS          : Maximum retry attempts to generate a 100%
+                                solvable map layout before fallback.
+                                Metric: Attempts (int).
+
+MIN_PATH_DIFFICULTY_RATIO     : Minimum required path difficulty ratio between
+                                start and exit tiles.
+                                Metric: Ratio [0.0 - 1.0] (float).
+
+
+[SENSORY & VISION ARC]
+-------------------------------------------------------------------------------
+VISION_RAYS                   : Number of sensor probe rays cast across the
+                                candidate's vision fan.
+                                Metric: Rays count (int).
+
+VISION_ARC_ANGLE              : Total field-of-view spread angle of the visual
+                                sensor fan.
+                                Metric: Degrees (float).
+
+VISION_MAX_DIST               : Maximum reach distance of vision rays measured
+                                in map tiles.
+                                Metric: Tiles (float).
+
+INCLUDE_COMPASS               : Enables two extra directional target compass
+                                channels (TG-L, TG-R). Disabling forces
+                                agents to navigate using wall rays alone.
+                                Metric: Toggle (bool).
+
+
+[KINEMATICS & PHYSICS]
+-------------------------------------------------------------------------------
+KINEMATICS_PROFILE            : Selects driving profile ("CAR" for velocity-
+                                scaled turns or "TANK" for in-place turns
+                                with idle health drain).
+                                Metric: Style string (str).
+
+MOVE_SPEED                    : Maximum forward movement distance per tick.
+                                Metric: Tiles/tick (float).
+
+TURN_SPEED                    : Maximum steering rotation speed.
+                                Metric: Degrees/sec (float).
+
+PLAYER_RADIUS_RATIO           : Scale factor for circular body collision hitbox
+                                relative to tile size.
+                                Metric: Ratio (float).
+
+PLAYER_CAMERA_ZOOM            : Camera zoom scale factor in Player-Centered
+                                tracking mode.
+                                Metric: Scale factor (float).
+
+HEALTH_COLL_DMG_PER_FRAME     : Health deducted per frame while touching or
+                                colliding with wall tiles.
+                                Metric: Damage ratio (float).
+
+HEALTH_IDLE_DMG_PER_FRAME     : Health deducted per frame when standing still
+                                or spinning in place.
+                                Metric: Damage ratio (float).
+
+HEALTH_RECOVERY_RATIO         : Health restored per unit of distance closed on
+                                setting new best exit records.
+                                Metric: Recovery ratio (float).
+
+[ANTI-SPIN & STAGNATION GUARDS]
+-------------------------------------------------------------------------------
+SPIN_PENALTY_ENABLED          : Enables the cumulative turn-angle spin penalty
+                                 system. When active, candidates whose
+                                 accumulated rotation exceeds
+                                 SPIN_ANGLE_THRESHOLD_DEG incur per-frame
+                                 damage. The counter resets each frame the
+                                 agent's angular delta falls below
+                                 SPIN_RESET_ANGLE_DEG.
+                                 Metric: Toggle (bool).
+
+SPIN_ANGLE_THRESHOLD_DEG      : Total accumulated absolute rotation in degrees
+                                 a candidate may accrue before spin damage
+                                 begins. The counter resets to zero on any
+                                 frame where the per-step angular delta is
+                                 below SPIN_RESET_ANGLE_DEG.
+                                 Metric: Degrees (float).
+
+SPIN_RESET_ANGLE_DEG          : Per-frame angular delta threshold in degrees.
+                                 If a candidate's turn this frame is below
+                                 this value the spin accumulator resets to
+                                 zero, clearing continuous spin debt for
+                                 agents travelling relatively straight.
+                                 Metric: Degrees (float).
+
+SPIN_DMG_PER_FRAME            : Health deducted per frame once the cumulative
+                                 spin threshold is exceeded.
+                                 Metric: Damage ratio (float).
+
+STAGNATION_ENABLED            : Enables the BFS progress stagnation clock.
+                                 When active, candidates failing to improve
+                                 their best BFS step-distance within the
+                                 stagnation window incur per-frame damage.
+                                 Metric: Toggle (bool).
+
+STAGNATION_TIMEOUT_RATIO      : Fraction of MAX_SIMULATION_STEPS allowed
+                                 without a new record BFS step-distance before
+                                 stagnation drain begins. Scales automatically
+                                 when MAX_SIMULATION_STEPS changes.
+                                 Stagnation limit = int(MAX_SIMULATION_STEPS
+                                 * STAGNATION_TIMEOUT_RATIO).
+                                 Metric: Ratio [0.0 - 1.0] (float).
+
+STAGNATION_DMG_PER_FRAME      : Health deducted per frame once the stagnation
+                                 timeout window is exceeded without a new BFS
+                                 record distance being set.
+                                 Metric: Damage ratio (float).
+
+
+[NEURAL ARCHITECTURE]
+-------------------------------------------------------------------------------
+NEURAL_HIDDEN_LAYERS          : Number of dense hidden layers in the MLP
+                                neural network architecture.
+                                Metric: Layers count (int).
+
+NEURAL_NEURONS                : Number of artificial neurons per hidden layer.
+                                Metric: Neurons count (int).
+
+
+[GENETIC ALGORITHM & TRAINING]
+-------------------------------------------------------------------------------
+LEARNING_GENERATIONS          : Total evolutionary generations simulated
+                                during pre-training.
+                                Metric: Generations count (int).
+
+POPULATION_SIZE               : Total candidate neural networks evaluated
+                                per generation.
+                                Metric: Candidates count (int).
+
+MAX_SIMULATION_STEPS          : Maximum frame ticks allowed per candidate run.
+                                Metric: Ticks/frames (int).
+
+MAP_REGIME_GENERATIONS        : Maximum generations to train on a single map
+                                layout before rotating maps.
+                                Metric: Generations count (int).
+
+REGIME_MIN_GENERATIONS        : Minimum generations required on a map before
+                                allowing mastery-based early rotation.
+                                Metric: Generations count (int).
+
+REGIME_SOLVE_TARGET           : Minimum successful candidate solvers required
+                                to trigger early map rotation.
+                                Metric: Solvers count (int).
+
+REGIME_TRANSITION_MUTATION_BOOST : Temporary mutation multiplier applied on
+                                transitioning to a new map layout.
+                                Metric: Scale factor (float).
+
+MAP_DIFFICULTY_MIN            : Minimum sampled path difficulty ratio when
+                                generating random training maps.
+                                Metric: Ratio [0.0 - 1.0] (float).
+
+MAP_DIFFICULTY_MAX            : Maximum sampled path difficulty ratio when
+                                generating random training maps.
+                                Metric: Ratio [0.0 - 1.0] (float).
+
+MUTATION_RATE                 : Probability of applying Gaussian mutations to
+                                offspring weights.
+                                Metric: Ratio [0.0 - 1.0] (float).
+
+MUTATION_SCALE                : Standard deviation noise scale applied to
+                                weights during mutation.
+                                Metric: Noise scale (float).
+
+ELITISM_RATIO                 : Ratio of top-scoring candidates preserved
+                                unchanged into the next generation.
+                                Metric: Ratio [0.0 - 1.0] (float).
+
+DEFAULT_PLAYBACK_SPEED        : Initial playback speed multiplier on booting
+                                the visualizer GUI.
+                                Metric: Speed multiplier (int).
+
+SCRUBBER_ARROW_JUMP_FRAMES    : Number of frames skipped per Arrow Left /
+                                 Arrow Right key press during GUI replay
+                                 scrubbing.
+                                 Metric: Frames (int).
+
+DIST_TO_TIME_BONUS_RATIO      : Relative weight multiplier comparing distance
+                                progress to time-saved bonus.
+                                Metric: Ratio [0.0 - 1.0] (float).
+
+LOST_HP_SCORE_IMPACT_RATIO    : Weighting factor determining how strongly health
+                                loss penalizes fitness score.
+                                Metric: Ratio [0.0 - 1.0] (float).
+
+
+[PARALLEL SIMULATION]
+-------------------------------------------------------------------------------
+SIMULATION_WORKERS            : Number of parallel CPU worker processes for
+                                batch candidate evaluation (0 = auto).
+                                Metric: Workers count (int).
+
+
+[CURRICULUM (ADAPTIVE DIFFICULTY)]
+-------------------------------------------------------------------------------
+CURRICULUM_ENABLED            : Activates adaptive difficulty stepping (starts
+                                with easy short paths and scales up).
+                                Metric: Toggle (bool).
+
+CURRICULUM_DIFFICULTY_RATIO   : Base wall density used during curriculum map
+                                generation.
+                                Metric: Ratio [0.0 - 1.0] (float).
+
+CURRICULUM_START_BFS          : Initial target topological path length for early
+                                training stages.
+                                Metric: Tiles (int).
+
+CURRICULUM_BFS_STEP           : Path length increase applied upon mastering
+                                a curriculum difficulty level.
+                                Metric: Tiles (int).
+
+CURRICULUM_BFS_WINDOW         : Acceptable path distance window margin when
+                                generating curriculum maps.
+                                Metric: Tiles (int).
+
+CURRICULUM_MAX_BFS            : Maximum targeted path distance cap for high
+                                difficulty curriculum maps.
+                                Metric: Tiles (int).
+
+CURRICULUM_MAP_ATTEMPTS       : Retry attempts allowed per regime to match
+                                requested curriculum target distance.
+                                Metric: Attempts (int).
+
+CURRICULUM_FAILURES_BEFORE_EASE : Consecutive unsolved regimes required before
+                                easing curriculum target distance back down.
+                                Metric: Regimes count (int).
+
+
+[GUI ELEMENT LAYOUT RECTANGLES]
+-------------------------------------------------------------------------------
+LAYOUT_GRID_RECT              : Position and size (x, y, width, height) of
+                                the candidate grid viewport section.
+                                Metric: Rectangle (int, int, int, int).
+
+LAYOUT_PANEL_RECT             : Position and size (x, y, width, height) of
+                                the telemetry overlay panel.
+                                Metric: Rectangle (int, int, int, int).
+
+LAYOUT_GRAPH_RECT             : Position and size (x, y, width, height) of
+                                the neural network activation graph panel.
+                                Metric: Rectangle (int, int, int, int).
+
+LAYOUT_SCRUBBER_RECT          : Position and size (x, y, width, height) of
+                                the interactive transport scrubber panel.
+                                Metric: Rectangle (int, int, int, int).
+
+
+[HUD TYPOGRAPHY & ELEMENT SIZING]
+-------------------------------------------------------------------------------
+HUD_PANEL_TITLE_FONT_SIZE     : Font point size for panel header titles.
+                                Metric: Points (int).
+
+HUD_PANEL_BODY_FONT_SIZE      : Font point size for panel telemetry text.
+                                Metric: Points (int).
+
+HUD_SCRUBBER_BTN_HEIGHT       : Pixel height for scrubber UI buttons.
+                                Metric: Pixels (int).
+
+HUD_SCRUBBER_BTN_FONT_SIZE    : Font point size for scrubber button text.
+                                Metric: Points (int).
+
+HUD_SCRUBBER_BAR_HEIGHT       : Pixel height for timeline track bars.
+                                Metric: Pixels (int).
+
+HUD_SCRUBBER_MARKER_RADIUS    : Pixel radius for timeline handle markers.
+                                Metric: Pixels (int).
+
+HUD_GRAPH_NODE_RADIUS         : Pixel radius for neural network graph nodes.
+                                Metric: Pixels (int).
+
+HUD_GRAPH_FONT_SIZE           : Font point size for neural graph labels.
+                                Metric: Points (int).
+
+HUD_GRAPH_LABEL_PADDING       : Spacing padding between graph nodes and
+                                text labels.
+                                Metric: Pixels (int).
+
+
+[VISUAL THEME & COLORS]
+-------------------------------------------------------------------------------
+COLOR_BG                      : Fill color for window background.
+                                Metric: RGB (int, int, int).
+
+COLOR_WALL                    : Fill color for wall tile obstacles.
+                                Metric: RGB (int, int, int).
+
+COLOR_WALL_BORDER             : Outline color for wall tiles and UI panel
+                                borders.
+                                Metric: RGB (int, int, int).
+
+COLOR_FLOOR                   : Fill color for walkable floor tiles.
+                                Metric: RGB (int, int, int).
+
+COLOR_FLOOR_BORDER            : Outline color for floor grid tile borders.
+                                Metric: RGB (int, int, int).
+
+COLOR_START                   : Color for candidate spawn tile and header
+                                accent text.
+                                Metric: RGB (int, int, int).
+
+COLOR_EXIT                    : Color for target exit tile and top score
+                                metrics.
+                                Metric: RGB (int, int, int).
+
+COLOR_PLAYER                  : Normal body color for candidates.
+                                Metric: RGB (int, int, int).
+
+COLOR_PLAYER_HIGHLIGHT        : Body and frame color for active selected
+                                candidate agent.
+                                Metric: RGB (int, int, int).
+
+COLOR_PLAYER_TEXT             : Text color for candidate facial expressions.
+                                Metric: RGB (int, int, int).
+
+COLOR_VISION_ARC              : Fill color for vision arc fan polygons.
+                                Metric: RGBA (int, int, int, int).
+
+PLAYER_FACE_TEXT_SCALE        : Scale factor for facial expressions relative
+                                to candidate body size.
+                                Metric: Scale factor (float).
+
+PLAYER_HEADING_LINE_LENGTH    : Scale factor for forward heading line length.
+                                Metric: Scale factor (float).
+
+PLAYER_HEADING_LINE_WIDTH     : Pixel width for forward heading indicator line.
+                                Metric: Pixels (int).
+
+COLOR_PLAYER_HEADING_LINE     : Color for forward heading indicator line.
+                                Metric: RGBA (int, int, int, int).
+
+
+[HEALTH BAR & STATUS FRAME COLORS]
+-------------------------------------------------------------------------------
+COLOR_HEALTH_FULL             : Health bar color when health is above 50%.
+                                Metric: RGB (int, int, int).
+
+COLOR_HEALTH_MID              : Health bar color when health is 20% to 50%.
+                                Metric: RGB (int, int, int).
+
+COLOR_HEALTH_LOW              : Health bar color when health is under 20%.
+                                Metric: RGB (int, int, int).
+
+COLOR_FRAME_SOLVED            : Viewport inset frame color for candidates
+                                that successfully reached the exit tile.
+                                Metric: RGB (int, int, int).
+
+COLOR_FRAME_DEAD              : Viewport inset frame color for candidates
+                                that expired from health depletion.
+                                Metric: RGB (int, int, int).
+
+
+[HUD & ACTIVATION GRAPH COLORS]
+-------------------------------------------------------------------------------
+COLOR_NODE_INACTIVE           : Color for inactive neural network nodes.
+                                Metric: RGB (int, int, int).
+
+COLOR_NODE_ACTIVE             : Color for fully active neural network nodes.
+                                Metric: RGB (int, int, int).
+
+COLOR_TIMELINE_BAR            : Background color for timeline track bars.
+                                Metric: RGB (int, int, int).
+
+COLOR_MARKER                  : Color for interactive timeline handle markers.
+                                Metric: RGB (int, int, int).
+
+COLOR_BUTTON                  : Default background color for UI buttons.
+                                Metric: RGB (int, int, int).
+
+COLOR_BUTTON_ACTIVE           : Active/pressed color for UI buttons.
+                                Metric: RGB (int, int, int).
+
+
+[CANDIDATE FACIAL EXPRESSIONS]
+-------------------------------------------------------------------------------
+FACE_WALK                     : Facial expression string rendered during normal
+                                walking traversal ("o_o").
+                                Metric: Expression string (str).
+
+FACE_WALL                     : Facial expression string rendered during wall
+                                impact collisions (">*<").
+                                Metric: Expression string (str).
+
+FACE_DEAD                     : Facial expression string rendered when health
+                                drops to zero ("T_T").
+                                Metric: Expression string (str).
+
+FACE_EXIT                     : Facial expression string rendered when candidate
+                                reaches the exit ("^*^").
+                                Metric: Expression string (str).
+
+===============================================================================
+[!] END OF MANUAL | MAINTAIN ALIGNMENT WITH MASTER SETTINGS FILE
+===============================================================================
+
+--- FILE: ./README.md ---
+```text
+ ____           __  __                                          __                 
+/\  _`\        /\ \/\ \                                        /\ \                
+\ \ \L\ \__  __\ \ \ \ \    ___   _ __    __    ___     ___    \_\ \  _ __   ___   
+ \ \ ,__/\ \/\ \\ \ \ \ \  / __`\/\`'__\/'__`\/' _ `\ /' _ `\  /'_` \/\`'__\/ __`\ 
+  \ \ \/\ \ \_\ \\ \ \_/ \/\ \L\ \ \ \//\  __//\ \/\ \/\ \/\ \/\ \L\ \ \ \//\ \L\ \
+   \ \_\ \/`____ \\ `\___/\ \____/\ \_\\ \____\ \_\ \_\ \_\ \_\ \___,_\ \_\\ \____/
+    \/_/  `/___/> \`\/__/  \/___/  \/_/ \/____/\/_/\/_/\/_/\/_/\/__,_ /\/_/ \/___/ 
+             /\___/                                                                
+             \/__/ 
+===============================================================================
+               PYVORENNDRO 2D - SYSTEM SPECIFICATIONS & GUIDE
+===============================================================================
+
+[1.0 SYSTEM OVERVIEW]
+-------------------------------------------------------------------------------
+Core Philosophy: Sovereign Compute, Matrix-Isolated, Zero-Dependency.
+Architecture   : High-performance 2D Neuroevolution Visualizer powered by a
+                 vectorized NumPy batch simulation engine (feature batch ->
+                 neural batch -> physics batch), PyBiwis 64-bit bitmask grid
+                 compression, grid-aligned Amanatides-Woo DDA raycasting,
+                 continuous Circle-to-AABB smooth wall physics, dual driving
+                 dynamics (Car and Tank profiles), adaptive curriculum
+                 training, and a dynamic Multi-Layer Perceptron (MLP).
+Primary Goal   : Train autonomous 2D candidate agents to navigate procedural
+                 labyrinths from randomized start locations to exit tiles
+                 using a 9-ray visual sensor fan and optional target guidance.
+Presentation   : Interactive GUI featuring dual camera tracking modes (Map-
+                 Centered and Player-Centered), 16x turbo speed controls,
+                 dual-bar scrubber transport, pre-rendered background surface
+                 caching, standardized 0-1000 score normalization, real-time
+                 neural activation graphs, and an 8-column CLI console table.
+
+[2.0 MEMORY, MAPS & PROCEDURAL GENERATION (PYBIWIS & NUMPY)]
+-------------------------------------------------------------------------------
+Grid Storage   : Rectangular tile grids (MAP_WIDTH x MAP_HEIGHT) stored in
+                 C-contiguous NumPy arrays for instant vectorized lookups.
+PyBiwis Chunks : Packed 64-bit integer words storing wall collision layouts.
+                 Compresses tile maps into tiny save snapshots and fast memory.
+100% Floor Fill: All level generators use flood-fill analysis to guarantee
+                 100% floor connectivity with zero isolated dead-end pockets.
+BFS Distance   : Every level builds an O(1) step-distance matrix. Each tile
+                 stores its exact topological step-distance to the exit.
+Dual Map Styles: Selectable procedural level generation algorithms:
+                 - "BRANCHING WALLS": Organic tree-like maze crawler growing
+                   continuous wall stems, 90-degree corners, and T-junctions
+                   without 2x2 solid wall blocks or isolated dead zones.
+                 - "RANDOM": Classic random scattered wall noise layout.
+Map Regimes    : Organizes training generations into controlled "regimes" on
+                 a single map layout. This gives agents time to master a
+                 specific maze before rotating environments. Transitioning
+                 to a new map temporarily boosts mutation rates to encourage
+                 exploration on new layouts.
+Curriculum     : Adaptive difficulty system that acts like a training ladder.
+Learning         It starts agents on short, easy paths (e.g. 8 tiles) and
+                 automatically steps up maze complexity as agents succeed. If
+                 the population struggles, it automatically eases difficulty.
+
+[3.0 SPATIAL PERCEPTION (9 TO 13 INPUT CHANNELS)]
+-------------------------------------------------------------------------------
+Vision Fan     : 9 probe rays distributed evenly across a 120-degree Field
+                 of View (VISION_ARC_ANGLE), calculated via grid-aligned
+                 Amanatides-Woo DDA. Measures proximity to walls:
+                 - Channels 0..8 (-60° to +60°): 0.0 for open space up to 1.0
+                   for a point-blank wall collision.
+Proprioception : 2 physical status channels:
+                 - Speed Channel (SPD): Current forward translation speed.
+                 - Health Channel (HP): Active candidate health ratio [0, 1].
+Optional       : Toggleable via INCLUDE_COMPASS in config. Adds 2 local
+Stereo Compass   target-guidance channels (TG-L, TG-R) encoding exit bearing
+                 relative to heading (expanding inputs from 11 to 13).
+                 Disabled by default so agents must learn maze structure from
+                 wall rays alone (e.g. wall-following).
+
+[4.0 NEURAL NETWORK ARCHITECTURE (MLP ENGINE)]
+-------------------------------------------------------------------------------
+Inputs         : 11 continuous sensory channels by default (9 Wall Rays +
+                 Speed + Health Ratio), or 13 when INCLUDE_COMPASS is True.
+Batched Pass   : Tensorized matrix multiplication (`np.einsum`) evaluating the
+                 entire population's neural decisions simultaneously.
+Hidden Layers  : Configurable multi-layer dense stack (NEURAL_HIDDEN_LAYERS,
+                 NEURAL_NEURONS) using ReLU activations and Xavier weights.
+Outputs (Fixed): 2 continuous motor control channels:
+                 - Move Effort (Sigmoid [0.0, 1.0]): Forward acceleration.
+                 - Turn Effort (Tanh [-1.0, 1.0]): Steering rotation delta.
+
+[5.0 KINEMATICS, HEALTH & DUAL STEERING PROFILES]
+-------------------------------------------------------------------------------
+Steering Profiles: Selectable via KINEMATICS_PROFILE in config:
+                 - "CAR": Turning rotation is scaled by forward velocity.
+                   Standing still prevents turning, forcing driving arcs.
+                 - "TANK": In-place differential steering. Turning while
+                   standing still is allowed but incurs an idle health
+                   penalty to discourage stationary spinning.
+Smooth Collision : Continuous Circle-to-AABB penetration resolution uses
+                   minimum translation vectors (MTV) to push agent bodies
+                   out of wall tiles, sliding smoothly along wall faces.
+Health & Damage  : Candidates start at 100% health. Health drains from:
+                   - Wall Collision Penalty (HEALTH_COLL_DMG_PER_FRAME).
+                   - Idle & Spin Penalty (HEALTH_IDLE_DMG_PER_FRAME).
+                   - Cumulative Spin Penalty (SPIN_DMG_PER_FRAME): Triggers
+                     once absolute turn accumulation exceeds
+                     SPIN_ANGLE_THRESHOLD_DEG without BFS progress.
+                   - Stagnation Penalty (STAGNATION_DMG_PER_FRAME): Triggers
+                     once a candidate fails to set a new record BFS distance
+                     within int(MAX_SIMULATION_STEPS *
+                     STAGNATION_TIMEOUT_RATIO) consecutive ticks.
+BFS Recovery     : Setting a NEW best record for closeness to the exit
+                   restores health based on distance closed. Also resets
+                   both the cumulative spin counter and the stagnation
+                   clock, so legitimate corridor navigation is never
+                   penalised for the turns it requires.
+Expressive UI    : Facial ASCII states map directly to physics events:
+                   - FACE_WALK : Normal walking traversal.
+                   - FACE_WALL : Active wall impact collision.
+                   - FACE_DEAD : Expired / zero health state.
+                   - FACE_EXIT : Successfully reached exit tile.
+
+[6.0 VISUALIZER INTERFACE & PERFORMANCE OPTIMIZATIONS]
+-------------------------------------------------------------------------------
+Batched Engine   : Computes entire generations in unified NumPy array operations
+                   (features -> neural decisions -> physics steps -> health),
+                   eliminating per-candidate Python loop overhead.
+Pre-Rendered Maps: Pre-renders static level geography into a single background
+                   image per generation, reducing thousands of tile draw
+                   calls down to 16 fast image copies (blits) at 60 FPS.
+Font Caching     : Memoizes OS font instances by point size to eliminate
+                   runtime font creation overhead.
+Alpha Scratchpad : Reuses a single pre-allocated transparent Surface for
+                   vision arc fan polygons, preventing memory allocations.
+Dual Camera      : Interactive ENTER key toggle switches between:
+                   - Map-Centered Mode: Fits entire level into viewport.
+                   - Player-Centered Mode: Locks selected agent to center
+                     with pixel-perfect SDL clipping masks.
+
+[7.0 NEUROEVOLUTION, FITNESS MATH & TIMELINE HUD]
+-------------------------------------------------------------------------------
+GA Engine        : Multi-generation evolutionary manager executing Elitism,
+                   Tournament Selection, Uniform Crossover, and Gaussian
+                   Weight Mutations across stacked 3D genome matrices.
+Fitness Math     : Unit-aligned scoring formula normalized to [0, 1000]:
+                   - Unit Alignment: Distance progress converts to frame tick
+                     equivalents (dist / MOVE_SPEED). 1 tile equals 10 ticks
+                     at speed 0.10, giving distance and speed bonus parity.
+                   - Ratio Control: DIST_TO_TIME_BONUS_RATIO balances distance
+                     progress against time saved.
+                   - Health Weight: LOST_HP_SCORE_IMPACT_RATIO penalizes wall
+                     scraping to reward clean navigation.
+
+[7.1 CLI PROGRESS TABLE]
+-------------------------------------------------------------------------------
+CLI Layout       : Right-aligned 8-column real-time console table tracking
+                   per-generation simulation progress during training:
+                   - GEN   : Active evolutionary generation number (1-based).
+                   - TOP   : Scaled top-candidate score [0, 1000].
+                   - AVG   : Average scaled population score [0.0, 1000.0].
+                   - WAY   : Initial BFS topological step-distance to exit.
+                   - TARG  : Target curriculum BFS distance.
+                   - FRAME : Step tick count of fastest exit solver (- if none).
+                   - EXITS : Solvers ratio out of population pool size.
+                   - TIME  : Execution wall-clock duration in seconds.
+
+[7.2 GUI VISUALIZER & TIMELINE HUD]
+-------------------------------------------------------------------------------
+Status Frames    : Solved runs feature Dark Green inset borders, dead runs
+                   feature Dark Red inset borders, and the selected agent
+                   is highlighted with a Yellow outer border.
+Interactive UI   : Transport controls with PLAY/PAUSE, REP ALL / REP 1 loop
+                   toggle, speed controls (1x to 16x Turbo), and timeline
+                   scrubbing for both frame steps and generations.
+Telemetry HUD    : Scaled 2-column overlay displaying selected candidate index,
+                   frame step count, generation status, top scores, average
+                   scores, and winning candidate indices.
+Activation Graph : Real-time neural activation graph rendering node layer
+                   intensities with dark-red-to-orange color shifts and
+                   shorthand input channel labels (-60°..+60°, SPD, HP).
+
+[8.0 DEVELOPMENT ROADMAP]
+-------------------------------------------------------------------------------
+Phase 1 [DONE] : MapData, PyBiwis Bitmasks, BFS Pathfinder, Map Generator.
+Phase 2 [DONE] : Config, Kinematics, PlayerState, Expressive Face Engine.
+Phase 3 [DONE] : Vision Arc DDA, Spatial Transformer, Neural MLP Engine.
+Phase 4 [DONE] : Headless GA Trainer, Fitness Evaluator, Frame Recorder.
+Phase 5 [DONE] : Multi-Map Grid Viewport, Neural Activation Graph, Timeline.
+Phase 6 [DONE] : Smooth Wall-Sliding Physics, Dual Camera Tracking, 16x Turbo
+                 Transport, Repeat Modes & 2-Column Telemetry Dashboard.
+Phase 7 [DONE] : Organic Branching Wall Generator, Pre-Rendered Tilemap Caching,
+                 Dynamic Font Caching & Alpha Scratchpad Optimization.
+Phase 8 [DONE] : Dual Kinematics Profiles, Unit-Aligned Fitness Math, Health
+                 Penalty Weighting & Standardized 0-1000 Score Engine.
+Phase 9 [DONE] : Vectorized Batch Simulation Engine, Grid-Aligned DDA Raycasting,
+                 Map Regime Dynamics, Adaptive Curriculum Learning, Optional
+                 Target Compass Toggle, and Execution Timing Telemetry.
+
+[9.0 RUNNING THE SIMULATOR]
+-------------------------------------------------------------------------------
+Requirements : Python 3.10+, NumPy, Pygame (2.6+ tested).
+Launch       : python main.py    (from the project root)
+                 - Executes LEARNING_GENERATIONS training runs headlessly,
+                   prints the per-generation CLI table, and boots the
+                   interactive visualizer GUI upon completion.
+GUI Controls : 
+                 - ENTER         : Toggle camera (Map-Centered / Player-Centered).
+                 - Left-Click    : Select viewport candidate or scrub timeline.
+                 - Double-Click  : Toggle single candidate zoom view.
+                 - Right-Click   : Decrease speed on speed control button.
+
+===============================================================================
+CONTRIBUTORS
+===============================================================================
+This project is developed and maintained by:
+* herbal1st (Lead Maintainer)
+* Elijah (scooterking38) — Simulation engine vectorisation & curriculum logic.
+
+===============================================================================
+[!] PYVORENNDRO 2D | SOVEREIGN NEUROEVOLUTION ENGINE
+===============================================================================
+Distributed under the PyVorengi Source-Available End User License Agreement.
+Copyright (c) 2026 herbal1st and Elijah. All Rights Reserved.
+Strictly for personal evaluation, education, private editing, and non-commercial
+research.
+
+--- FILE: ./__init__.py ---
+
+
+--- FILE: ./main.py ---
+"""
+Application entry point executing pre-training and launching visualizer GUI.
+"""
+
+import sys
+import pygame
+
+import config
+from evolution.trainer import HeadlessTrainer
+from visualization.viewport_grid import ViewportGrid
+from visualization.network_graph import NetworkGraph
+from visualization.timeline_scrubber import TimelineScrubber
+from visualization.overlay_panel import OverlayPanel
+
+
+def main() -> None:
+    """
+    Runs headless neuroevolution, then initializes Pygame interactive GUI.
+    """
+    # 1. Run Headless Training Loop & Pre-calculate Generations
+    trainer = HeadlessTrainer()
+    recorder = trainer.run_training_session()
+
+    total_gens: int = len(recorder.generations_history)
+    if total_gens == 0:
+        print("[Error] No generation history recorded.")
+        sys.exit(1)
+
+    # 2. Initialize Pygame GUI Window
+        # 2. Initialize Pygame GUI Window
+    pygame.init()
+    pygame.key.set_repeat(300, 50)
+    screen: pygame.Surface = pygame.display.set_mode(
+        (config.SCREEN_WIDTH, config.SCREEN_HEIGHT)
+    )
+    pygame.display.set_caption(
+        "PyVorenndro 2D - Neuroevolution Visualizer"
+    )
+    clock: pygame.time.Clock = pygame.time.Clock()
+
+    # 3. Instantiate Layout Sub-Systems using config rectangles
+    viewport_grid = ViewportGrid(config.LAYOUT_GRID_RECT)
+    overlay_panel = OverlayPanel(config.LAYOUT_PANEL_RECT)
+    network_graph = NetworkGraph(config.LAYOUT_GRAPH_RECT)
+    timeline_scrubber = TimelineScrubber(config.LAYOUT_SCRUBBER_RECT)
+
+    active_gen: int = 0
+    active_frame: int = 0
+    last_click_time: int = 0
+
+    running: bool = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    viewport_grid.toggle_camera_mode()
+
+                elif event.key == pygame.K_SPACE:
+                    timeline_scrubber.is_playing = (
+                        not timeline_scrubber.is_playing
+                    )
+
+                elif event.key == pygame.K_RIGHT:
+                    active_frame = min(
+                        active_frame +
+                        config.SCRUBBER_ARROW_JUMP_FRAMES,
+                        config.MAX_SIMULATION_STEPS - 1
+                    )
+
+                elif event.key == pygame.K_LEFT:
+                    active_frame = max(
+                        active_frame -
+                        config.SCRUBBER_ARROW_JUMP_FRAMES,
+                        0
+                    )
+
+                elif event.key == pygame.K_PAGEUP:
+                    active_gen = min(
+                        active_gen +
+                        config.SCRUBBER_PAGE_JUMP_GENS,
+                        total_gens - 1
+                    )
+                    active_frame = 0
+
+                elif event.key == pygame.K_PAGEDOWN:
+                    active_gen = max(
+                        active_gen -
+                        config.SCRUBBER_PAGE_JUMP_GENS,
+                        0
+                    )
+                    active_frame = 0
+
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button in (1, 2, 3, 4, 5):
+                    now_ms: int = pygame.time.get_ticks()
+                    is_double: bool = (
+                        event.button == 1 and
+                        (now_ms - last_click_time) < 300
+                    )
+                    if event.button == 1:
+                        last_click_time = now_ms
+
+                    m_pos = event.pos
+
+                    if event.button == 1:
+                        viewport_grid.handle_click(
+                            m_pos, is_double_click=is_double
+                        )
+
+                    gen_data = recorder.get_generation_data(active_gen)
+                    total_f = config.MAX_SIMULATION_STEPS
+
+                    was_playing_before: bool = (
+                        timeline_scrubber.is_playing
+                    )
+                    new_gen, new_frame = timeline_scrubber.handle_click(
+                        m_pos,
+                        total_gens,
+                        total_f,
+                        mouse_button=event.button
+                    )
+
+                    # Auto-restart if Play is pressed at end boundary
+                    if (
+                        not was_playing_before and
+                        timeline_scrubber.is_playing and
+                        active_frame >= total_f - 1
+                    ):
+                        if (
+                            active_gen >= total_gens - 1 and
+                            timeline_scrubber.repeat_all
+                        ):
+                            active_gen = 0
+                        active_frame = 0
+
+                    if new_gen is not None:
+                        active_gen = new_gen
+                        active_frame = 0
+
+                    if new_frame is not None:
+                        active_frame = new_frame
+
+        gen_data = recorder.get_generation_data(active_gen)
+        cand_idx = viewport_grid.selected_idx
+        cand_frames = gen_data["candidate_frames"]
+
+        safe_cand_idx: int = min(cand_idx, len(cand_frames) - 1)
+        total_f = config.MAX_SIMULATION_STEPS
+        selected_frames = (
+            cand_frames[safe_cand_idx] if cand_frames else []
+        )
+
+        # Auto-play generation advancement & repeat mode handling
+        if timeline_scrubber.is_playing:
+            active_frame += timeline_scrubber.playback_speed
+            if active_frame >= total_f:
+                if timeline_scrubber.repeat_all:
+                    if active_gen < total_gens - 1:
+                        active_gen += 1
+                        active_frame = 0
+                    else:
+                        active_gen = 0
+                        active_frame = 0
+                else:
+                    active_frame = 0
+
+        screen.fill(config.COLOR_BG)
+
+        viewport_grid.draw_grid(screen, gen_data, active_frame)
+        overlay_panel.draw_panel(
+            screen,
+            gen_data,
+            safe_cand_idx,
+            active_frame,
+            config.MAX_SIMULATION_STEPS,
+            total_gens
+        )
+        network_graph.draw_graph(
+            screen, gen_data, safe_cand_idx, active_frame
+        )
+        timeline_scrubber.draw_controls(
+            screen,
+            active_gen,
+            total_gens,
+            active_frame,
+            total_f,
+            gen_history=recorder.generations_history,
+            selected_cand_frames=selected_frames
+        )
+
+        pygame.display.flip()
+        clock.tick(config.FPS)
+
+    pygame.quit()
+
+if __name__ == "__main__":
+    main()
+
+
+--- FILE: ./config.py ---
+"""
+Global configuration settings for PyVorenndro 2D engine.
+"""
+
+from typing import Tuple
+
+# ------ Display & Grid Layout ------
+SCREEN_WIDTH: int = 1280  # pixels
+SCREEN_HEIGHT: int = 720  # pixels
+FPS: int = 60  # hertz
+GRID_ROWS: int = 4  # count
+GRID_COLS: int = 4  # count
+
+# ------ World & Map Parameters ------
+MAP_TYPE: str = "BRANCHING WALLS"  # style
+MAP_WIDTH: int = 12  # tiles
+MAP_HEIGHT: int = 9  # tiles
+TILE_SIZE: int = 24  # pixels
+WALL_DENSITY: float = 0.45  # ratio
+MAX_MAP_GEN_ATTEMPTS: int = 100  # attempts
+MIN_PATH_DIFFICULTY_RATIO: float = 0.55  # ratio
+
+# ------ Sensory & Vision Arc ------
+VISION_RAYS: int = 19  # rays
+VISION_ARC_ANGLE: float = 270.0  # degrees
+VISION_MAX_DIST: float = 5.0  # tiles
+INCLUDE_COMPASS: bool = True  # toggle
+
+# ------ Kinematics & Physics ------
+KINEMATICS_PROFILE: str = "TANK"  # style (option 2: "CAR")
+MOVE_SPEED: float = 0.15  # tiles
+TURN_SPEED: float = 1800.0  # dpsec
+PLAYER_RADIUS_RATIO: float = 0.5  # ratio
+PLAYER_CAMERA_ZOOM: float = 0.5  # scale
+HEALTH_COLL_DMG_PER_FRAME: float = 0.003  # damage
+HEALTH_IDLE_DMG_PER_FRAME: float = 0.001  # damage
+HEALTH_IDLE_MOVE_THRESHOLD: float = 0.005  # ratio
+HEALTH_RECOVERY_RATIO: float = 0.05  # ratio
+
+# ------ Anti-Spin & Stagnation Guards ------
+SPIN_PENALTY_ENABLED: bool = True  # toggle
+SPIN_ANGLE_THRESHOLD_DEG: float = 360.0  # degrees
+SPIN_RESET_ANGLE_DEG: float = 5.0 # degrees
+SPIN_DMG_PER_FRAME: float = 0.003  # damage
+STAGNATION_ENABLED: bool = True  # toggle
+STAGNATION_TIMEOUT_RATIO: float = 0.75  # ratio
+STAGNATION_DMG_PER_FRAME: float = 0.001  # damage
+
+# ------ Neural Architecture ------
+NEURAL_HIDDEN_LAYERS: int = 2  # layers
+NEURAL_NEURONS: int = 12  # neurons
+
+# ------ Genetic Algorithm & Training ------
+LEARNING_GENERATIONS: int = 200  # generations
+POPULATION_SIZE: int = 16  # candidates
+MAX_SIMULATION_STEPS: int = 1000  # ticks
+MAP_REGIME_GENERATIONS: int = 1  # generations
+REGIME_MIN_GENERATIONS: int = 8  # generations
+REGIME_SOLVE_TARGET: int = 1  # solvers
+REGIME_TRANSITION_MUTATION_BOOST: float = 1.0  # scale
+MAP_DIFFICULTY_MIN: float = 0.55  # ratio
+MAP_DIFFICULTY_MAX: float = 0.85  # ratio
+MUTATION_RATE: float = 0.15  # ratio
+MUTATION_SCALE: float = 0.08  # scale
+ELITISM_RATIO: float = 0.20  # ratio
+DEFAULT_PLAYBACK_SPEED: int = 1  # multiplier
+SCRUBBER_ARROW_JUMP_FRAMES: int = 25  # frames
+SCRUBBER_PAGE_JUMP_GENS: int = 1  # generations
+DIST_TO_TIME_BONUS_RATIO: float = 1.0  # ratio
+LOST_HP_SCORE_IMPACT_RATIO: float = 0.5  # ratio
+
+# ------ Parallel Simulation ------
+SIMULATION_WORKERS: int = 0  # workers
+
+# ------ Curriculum (Adaptive Difficulty) ------
+CURRICULUM_ENABLED: bool = True  # toggle
+CURRICULUM_DIFFICULTY_RATIO: float = 0.5  # ratio
+CURRICULUM_START_BFS: int = 8  # tiles
+CURRICULUM_BFS_STEP: int = 2  # tiles
+CURRICULUM_BFS_WINDOW: int = 4  # tiles
+CURRICULUM_MAX_BFS: int = 20  # tiles
+CURRICULUM_MAP_ATTEMPTS: int = 10  # attempts
+CURRICULUM_FAILURES_BEFORE_EASE: int = 2  # failures
+
+# ------ GUI Element Layout Rectangles ------
+LAYOUT_GRID_RECT: Tuple[int, int, int, int] = (20, 20, 800, 600)  # rect
+LAYOUT_PANEL_RECT: Tuple[int, int, int, int] = (840, 20, 420, 140)  # rect
+LAYOUT_GRAPH_RECT: Tuple[int, int, int, int] = (840, 180, 420, 440)  # rect
+LAYOUT_SCRUBBER_RECT: Tuple[int, int, int, int] = (
+    20, 650, 1240, 60
+)  # rect
+
+# ------ HUD Typography & Element Sizing ------
+HUD_PANEL_TITLE_FONT_SIZE: int = 16  # pt
+HUD_PANEL_BODY_FONT_SIZE: int = 15  # pt
+HUD_SCRUBBER_BTN_HEIGHT: int = 36  # pixels
+HUD_SCRUBBER_BTN_FONT_SIZE: int = 13  # pt
+HUD_SCRUBBER_BAR_HEIGHT: int = 16  # pixels
+HUD_SCRUBBER_MARKER_RADIUS: int = 8  # pixels
+HUD_GRAPH_NODE_RADIUS: int = 8  # pixels
+HUD_GRAPH_FONT_SIZE: int = 12  # pt
+HUD_GRAPH_LABEL_PADDING: int = 6  # pixels
+
+# ------ Visual Theme & Colors ------
+COLOR_BG: Tuple[int, int, int] = (15, 15, 20)  # rgb
+COLOR_WALL: Tuple[int, int, int] = (45, 45, 55)  # rgb
+COLOR_WALL_BORDER: Tuple[int, int, int] = (80, 80, 95)  # rgb
+COLOR_FLOOR: Tuple[int, int, int] = (25, 25, 32)  # rgb
+COLOR_FLOOR_BORDER: Tuple[int, int, int] = (35, 35, 45)  # rgb
+COLOR_START: Tuple[int, int, int] = (40, 160, 220)  # rgb
+COLOR_EXIT: Tuple[int, int, int] = (50, 200, 100)  # rgb
+COLOR_PLAYER: Tuple[int, int, int] = (240, 180, 50)  # rgb
+COLOR_PLAYER_HIGHLIGHT: Tuple[int, int, int] = (255, 220, 80)  # rgb
+COLOR_PLAYER_TEXT: Tuple[int, int, int] = (10, 10, 15)  # rgb
+COLOR_VISION_ARC: Tuple[int, int, int, int] = (255, 220, 80, 30)  # rgba
+PLAYER_FACE_TEXT_SCALE: float = 0.80  # scale
+PLAYER_HEADING_LINE_LENGTH: float = 1.25  # scale
+PLAYER_HEADING_LINE_WIDTH: int = 1  # pixels
+COLOR_PLAYER_HEADING_LINE: Tuple[int, int, int, int] = (
+    255, 255, 255, 120
+)  # rgba
+
+# ------ Health Bar & Status Frame Colors ------
+COLOR_HEALTH_FULL: Tuple[int, int, int] = (50, 200, 100)  # rgb
+COLOR_HEALTH_MID: Tuple[int, int, int] = (255, 140, 0)  # rgb
+COLOR_HEALTH_LOW: Tuple[int, int, int] = (220, 50, 50)  # rgb
+COLOR_FRAME_SOLVED: Tuple[int, int, int] = (20, 140, 50)  # rgb
+COLOR_FRAME_DEAD: Tuple[int, int, int] = (160, 20, 20)  # rgb
+
+# ------ HUD & Activation Graph Colors ------
+COLOR_NODE_INACTIVE: Tuple[int, int, int] = (80, 15, 15)  # rgb
+COLOR_NODE_ACTIVE: Tuple[int, int, int] = (255, 140, 0)  # rgb
+COLOR_TIMELINE_BAR: Tuple[int, int, int] = (60, 60, 75)  # rgb
+COLOR_MARKER: Tuple[int, int, int] = (255, 140, 0)  # rgb
+COLOR_BUTTON: Tuple[int, int, int] = (45, 45, 55)  # rgb
+COLOR_BUTTON_ACTIVE: Tuple[int, int, int] = (80, 80, 100)  # rgb
+
+# ------ Candidate Facial Expressions ------
+FACE_WALK: str = "o_o"  # expression
+FACE_WALL: str = ">*<"  # expression
+FACE_DEAD: str = "T_T"  # expression
+FACE_EXIT: str = "^*^"  # expression
+
+
+--- FILE: ./core/__init__.py ---
+
+
+--- FILE: ./core/kinematics.py ---
+"""
+Candidate movement physics and position LERP interpolation.
+"""
+
+import math
+from typing import Tuple, Optional
+import numpy as np
+from numpy.typing import NDArray
+
+import config
+from core.map_data import MapData
+
+
+class KinematicsProfile:
+    """
+    Abstract base steering profile defining rotation dynamics.
+    """
+
+    def calculate_rotation(
+        self,
+        heading_rad: float,
+        turn_effort: float,
+        move_effort: float,
+        rad_per_frame: float
+    ) -> Tuple[float, bool]:
+        """
+        Calculates updated heading and returns stationary turning state.
+        """
+        raise NotImplementedError
+
+
+class CarProfile(KinematicsProfile):
+    """
+    Car dynamics: rotation velocity is scaled directly by forward effort.
+    """
+
+    def calculate_rotation(
+        self,
+        heading_rad: float,
+        turn_effort: float,
+        move_effort: float,
+        rad_per_frame: float
+    ) -> Tuple[float, bool]:
+        """
+        Applies rotation scaled by forward movement effort.
+        """
+        clamped_turn: float = max(-1.0, min(1.0, turn_effort))
+        clamped_move: float = max(0.0, min(1.0, move_effort))
+        effective_turn: float = clamped_turn * clamped_move
+
+        new_heading: float = heading_rad + (effective_turn * rad_per_frame)
+        return new_heading % (2.0 * math.pi), False
+
+
+class TankProfile(KinematicsProfile):
+    """
+    Tank dynamics: steering works in place; stationary turning drains HP.
+    """
+
+    def calculate_rotation(
+        self,
+        heading_rad: float,
+        turn_effort: float,
+        move_effort: float,
+        rad_per_frame: float
+    ) -> Tuple[float, bool]:
+        """
+        Applies differential in-place rotation independent of move effort.
+        """
+        clamped_turn: float = max(-1.0, min(1.0, turn_effort))
+        clamped_move: float = max(0.0, min(1.0, move_effort))
+
+        new_heading: float = heading_rad + (clamped_turn * rad_per_frame)
+        is_stationary_turn: bool = (
+            abs(clamped_turn) > 0.05 and clamped_move < 0.05
+        )
+        return new_heading % (2.0 * math.pi), is_stationary_turn
+
+
+class CandidateKinematics:
+    """
+    Handles 2D continuous movement physics and Circle-to-AABB collisions.
+    """
+
+    def __init__(
+        self,
+        move_speed: float = config.MOVE_SPEED,
+        turn_speed_dpsec: float = config.TURN_SPEED,
+        radius_ratio: float = config.PLAYER_RADIUS_RATIO,
+        fps: int = config.FPS,
+        profile_style: str = config.KINEMATICS_PROFILE
+    ) -> None:
+        """
+        Initializes physical movement constants and steering profile.
+        """
+        self.move_speed: float = move_speed
+        self.radius: float = 0.5 * radius_ratio
+        self.rad_per_frame: float = (
+            math.radians(turn_speed_dpsec) / float(fps)
+        )
+        if profile_style.upper() == "TANK":
+            self.profile: KinematicsProfile = TankProfile()
+        else:
+            self.profile = CarProfile()
+
+    def apply_rotation(
+        self,
+        heading_rad: float,
+        turn_effort: float,
+        move_effort: float = 1.0
+    ) -> Tuple[float, bool]:
+        """
+        Delegates rotational calculation to active steering profile.
+        """
+        return self.profile.calculate_rotation(
+            heading_rad, turn_effort, move_effort, self.rad_per_frame
+        )
+
+    def calculate_forward_step(
+        self,
+        curr_x: float,
+        curr_y: float,
+        heading_rad: float,
+        move_effort: float,
+        map_data: MapData
+    ) -> Tuple[float, float, bool]:
+        """
+        Calculates step and resolves Circle-to-AABB penetration pushback.
+        """
+        clamped_effort: float = max(0.0, min(1.0, move_effort))
+        if clamped_effort < 1e-4:
+            return curr_x, curr_y, False
+
+        step_dist: float = clamped_effort * self.move_speed
+        next_x: float = curr_x + (math.cos(heading_rad) * step_dist)
+        next_y: float = curr_y + (math.sin(heading_rad) * step_dist)
+
+        resolved_x, resolved_y, hit = self._resolve_circle_aabb(
+            next_x, next_y, map_data
+        )
+        return resolved_x, resolved_y, hit
+
+    def step_batch(
+        self,
+        xs: NDArray[np.float64],
+        ys: NDArray[np.float64],
+        headings: NDArray[np.float64],
+        move_effort: NDArray[np.float64],
+        turn_effort: NDArray[np.float64],
+        map_data: MapData,
+        wall_grid: Optional[NDArray[np.bool_]] = None
+    ) -> Tuple[
+        NDArray[np.float64],
+        NDArray[np.float64],
+        NDArray[np.float64],
+        NDArray[np.bool_],
+        NDArray[np.bool_]
+    ]:
+        """Vectorized rotation, forward step, and Circle-to-AABB resolution.
+
+        Returns (x, y, heading, hit, is_stationary_turn).
+        """
+        if wall_grid is None:
+            wall_grid = map_data.build_wall_grid()
+        h, w = wall_grid.shape
+        r: float = self.radius
+        n: int = int(xs.shape[0])
+        
+        clamped_turn: NDArray[np.float64] = np.clip(turn_effort, -1.0, 1.0)
+        clamped_move: NDArray[np.float64] = np.clip(move_effort, 0.0, 1.0)
+        
+        # Branch rotation dynamics based on the active kinematics profile
+        if isinstance(self.profile, CarProfile):
+            effective_turn: NDArray[np.float64] = clamped_turn * clamped_move
+            is_stationary_turn: NDArray[np.bool_] = np.zeros(
+                n, dtype=np.bool_
+            )
+        else:
+            effective_turn = clamped_turn
+            is_stationary_turn = (
+                (np.abs(clamped_turn) > 0.05) & (clamped_move < 0.05)
+            )
+            
+        new_headings: NDArray[np.float64] = (
+            headings + (effective_turn * self.rad_per_frame)
+        ) % (2.0 * math.pi)
+        
+        no_move: NDArray[np.bool_] = clamped_move < 1e-4
+        step_dist: NDArray[np.float64] = clamped_move * self.move_speed
+        px: NDArray[np.float64] = xs + (np.cos(new_headings) * step_dist)
+        py: NDArray[np.float64] = ys + (np.sin(new_headings) * step_dist)
+        px = np.where(no_move, xs, px)
+        py = np.where(no_move, ys, py)
+        
+        hit: NDArray[np.bool_] = np.zeros(n, dtype=np.bool_)
+        for _ in range(2):
+            base_tx: NDArray[np.int64] = np.floor(px).astype(np.int64)
+            base_ty: NDArray[np.int64] = np.floor(py).astype(np.int64)
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    tx: NDArray[np.int64] = base_tx + dx
+                    ty: NDArray[np.int64] = base_ty + dy
+                    inb: NDArray[np.bool_] = (
+                        (tx >= 0) & (tx < w) & (ty >= 0) & (ty < h)
+                    )
+                    txc: NDArray[np.int64] = np.clip(tx, 0, w - 1)
+                    tyc: NDArray[np.int64] = np.clip(ty, 0, h - 1)
+                    is_wall: NDArray[np.bool_] = inb & wall_grid[tyc, txc]
+                    if not bool(is_wall.any()):
+                        continue
+                    cx: NDArray[np.float64] = np.clip(
+                        px, tx.astype(np.float64), (tx + 1).astype(np.float64)
+                    )
+                    cy: NDArray[np.float64] = np.clip(
+                        py, ty.astype(np.float64), (ty + 1).astype(np.float64)
+                    )
+                    ddx: NDArray[np.float64] = px - cx
+                    ddy: NDArray[np.float64] = py - cy
+                    dist_sq: NDArray[np.float64] = (ddx * ddx) + (ddy * ddy)
+                    pen: NDArray[np.bool_] = is_wall & (dist_sq < (r * r))
+                    hit |= pen
+                    if not bool(pen.any()):
+                        continue
+                    dist: NDArray[np.float64] = np.sqrt(dist_sq)
+                    overlap: NDArray[np.float64] = r - dist
+                    zero: NDArray[np.bool_] = pen & (dist_sq < 1e-12)
+                    with np.errstate(divide="ignore", invalid="ignore"):
+                        nrm_x: NDArray[np.float64] = np.where(
+                            dist > 1e-6, ddx / dist, 0.0
+                        )
+                        nrm_y: NDArray[np.float64] = np.where(
+                            dist > 1e-6, ddy / dist, 0.0
+                        )
+                    px = np.where(pen, px + (nrm_x * overlap), px)
+                    py = np.where(pen, py + (nrm_y * overlap), py)
+                    px = np.where(zero, px + 0.01, px)
+                    py = np.where(zero, py + 0.01, py)
+        px = np.where(no_move, xs, px)
+        py = np.where(no_move, ys, py)
+        hit = np.where(no_move, False, hit)
+        return px, py, new_headings, hit, is_stationary_turn
+
+    def interpolate_pixel_pos(
+        self,
+        tile_x: float,
+        tile_y: float,
+        tile_size: int = config.TILE_SIZE
+    ) -> Tuple[int, int]:
+        """
+        Converts continuous tile coordinates to screen pixel positions.
+        """
+        pixel_x: int = int(round(tile_x * tile_size))
+        pixel_y: int = int(round(tile_y * tile_size))
+        return pixel_x, pixel_y
+
+    def _resolve_circle_aabb(
+        self,
+        px: float,
+        py: float,
+        map_data: MapData,
+        passes: int = 2
+    ) -> Tuple[float, float, bool]:
+        """
+        Resolves circle penetration against surrounding wall tile AABBs.
+        """
+        r: float = self.radius
+        has_collided: bool = False
+
+        for _ in range(passes):
+            min_tx: int = max(0, int(math.floor(px - r)))
+            max_tx: int = min(
+                map_data.width - 1, int(math.floor(px + r))
+            )
+            min_ty: int = max(0, int(math.floor(py - r)))
+            max_ty: int = min(
+                map_data.height - 1, int(math.floor(py + r))
+            )
+
+            for ty in range(min_ty, max_ty + 1):
+                for tx in range(min_tx, max_tx + 1):
+                    if not map_data.is_wall(tx, ty):
+                        continue
+
+                    cx: float = max(
+                        float(tx), min(px, float(tx) + 1.0)
+                    )
+                    cy: float = max(
+                        float(ty), min(py, float(ty) + 1.0)
+                    )
+
+                    dx: float = px - cx
+                    dy: float = py - cy
+                    dist_sq: float = (dx * dx) + (dy * dy)
+
+                    if dist_sq < (r * r):
+                        has_collided = True
+                        dist: float = math.sqrt(dist_sq)
+
+                        if dist > 1e-6:
+                            overlap: float = r - dist
+                            nx: float = dx / dist
+                            ny: float = dy / dist
+                            px += nx * overlap
+                            py += ny * overlap
+                        else:
+                            px += 0.01
+                            py += 0.01
+
+        return px, py, has_collided
+
+
+--- FILE: ./core/map_data.py ---
+"""
+Data structures for 2D map grids and compact PyBiwis bitmask encoding.
+"""
+
+from typing import List, Tuple
+import numpy as np
+
+
+class MapData:
+    """
+    Stores 2D tile layout data with PyBiwis 64-bit bitmask packing.
+    """
+
+    def __init__(
+        self,
+        width: int,
+        height: int,
+        start_pos: Tuple[int, int],
+        exit_pos: Tuple[int, int]
+    ) -> None:
+        """
+        Initializes map layout grids and entry/exit coordinates.
+        """
+        self.width: int = width
+        self.height: int = height
+        self.start_pos: Tuple[int, int] = start_pos
+        self.exit_pos: Tuple[int, int] = exit_pos
+        self.grid: List[List[int]] = [
+            [0 for _ in range(width)] for _ in range(height)
+        ]
+        self.bitmask_chunks: List[int] = []
+
+    def set_wall(self, x: int, y: int, is_wall: bool = True) -> None:
+        """
+        Sets wall state at the designated tile coordinate.
+        """
+        val: int = 1 if is_wall else 0
+        self.grid[y][x] = val
+
+    def is_wall(self, x: int, y: int) -> bool:
+        """
+        Checks if tile coordinates contain a wall or are out of bounds.
+        """
+        if x < 0 or x >= self.width or y < 0 or y >= self.height:
+            return True
+        return self.grid[y][x] == 1
+
+    def is_walkable(self, x: int, y: int) -> bool:
+        """
+        Checks if tile coordinates are open for traversal.
+        """
+        return not self.is_wall(x, y)
+
+    def build_wall_grid(self) -> np.ndarray:
+        """
+        Returns a boolean (height, width) wall lookup grid for vectorized ops.
+        """
+        return np.array(self.grid, dtype=np.bool_)
+
+    def encode_bitmask(self) -> List[int]:
+        """
+        Packs the 2D grid into 64-bit PyBiwis integer chunks.
+        """
+        total_tiles: int = self.width * self.height
+        num_chunks: int = (total_tiles + 63) // 64
+        chunks: List[int] = [0] * num_chunks
+
+        for y in range(self.height):
+            for x in range(self.width):
+                if self.grid[y][x] == 1:
+                    flat_idx: int = x + (y * self.width)
+                    chunk_idx: int = flat_idx // 64
+                    bit_off: int = flat_idx % 64
+                    chunks[chunk_idx] |= (1 << bit_off)
+
+        self.bitmask_chunks = chunks
+        return chunks
+
+    def decode_bitmask(self, chunks: List[int]) -> None:
+        """
+        Unpacks 64-bit PyBiwis integer chunks into the 2D tile grid.
+        """
+        self.bitmask_chunks = chunks
+        for y in range(self.height):
+            for x in range(self.width):
+                flat_idx: int = x + (y * self.width)
+                chunk_idx: int = flat_idx // 64
+                bit_off: int = flat_idx % 64
+                is_set: bool = bool(
+                    (chunks[chunk_idx] >> bit_off) & 1
+                )
+                self.grid[y][x] = 1 if is_set else 0
+
+
+--- FILE: ./core/map_generator.py ---
+"""
+Procedural map generator producing solvable grid levels validated via BFS.
+"""
+
+import random
+from collections import deque
+from typing import List, Tuple, Optional, Set
+
+import config
+from core.map_data import MapData
+from core.pathfinder import BFSPathfinder
+
+
+class MapGenerator:
+    """
+    Generates procedural grid maps with guaranteed solvable paths.
+    """
+
+    def __init__(
+        self,
+        width: int = config.MAP_WIDTH,
+        height: int = config.MAP_HEIGHT,
+        map_type: str = config.MAP_TYPE
+    ) -> None:
+        """
+        Initializes generator dimensions and map layout generation style.
+        """
+        self.width: int = width
+        self.height: int = height
+        self.map_type: str = map_type
+
+    def generate_solvable_map(
+        self,
+        wall_density: float = config.WALL_DENSITY,
+        difficulty_ratio: float = config.MIN_PATH_DIFFICULTY_RATIO,
+        max_attempts: int = config.MAX_MAP_GEN_ATTEMPTS
+    ) -> MapData:
+        """
+        Generates a solvable layout with start/exit and difficulty check.
+        """
+        for _ in range(max_attempts):
+            map_data: Optional[MapData] = self._try_generate_map(
+                wall_density, difficulty_ratio
+            )
+            if map_data is not None:
+                map_data.encode_bitmask()
+                return map_data
+
+        return self._build_fallback_map()
+
+    def _try_generate_map(
+        self,
+        wall_density: float,
+        difficulty_ratio: float
+    ) -> Optional[MapData]:
+        """
+        Builds a map layout and verifies 100% floor connectivity via flood-fill.
+        """
+        dummy_start: Tuple[int, int] = (1, 1)
+        dummy_exit: Tuple[int, int] = (self.width - 2, self.height - 2)
+        map_data: MapData = MapData(
+            self.width, self.height, dummy_start, dummy_exit
+        )
+
+        if self.map_type == "BRANCHING WALLS":
+            self._generate_branching_walls_map(map_data, wall_density)
+        else:
+            self._generate_random_scatter_map(map_data, wall_density)
+
+        open_tiles: List[Tuple[int, int]] = [
+            (x, y) for y in range(1, self.height - 1)
+            for x in range(1, self.width - 1)
+            if map_data.is_walkable(x, y)
+        ]
+
+        if len(open_tiles) < 2:
+            return None
+
+        # Flood-fill connectivity check from first open tile
+        connected_tiles: Set[Tuple[int, int]] = self._flood_fill_region(
+            open_tiles[0], map_data
+        )
+
+        # Reject layout if any isolated islands exist
+        if len(connected_tiles) != len(open_tiles):
+            return None
+
+        # Pick random start_pos from fully connected floor
+        start_pos: Tuple[int, int] = random.choice(open_tiles)
+        map_data.start_pos = start_pos
+
+        # Run BFS from start_pos to find exact max reachable step distance
+        dist_from_start: Optional[List[List[int]]] = (
+            self._compute_start_bfs(start_pos, map_data)
+        )
+        if dist_from_start is None:
+            return None
+
+        reachable_distances: List[int] = [
+            dist_from_start[pos[1]][pos[0]]
+            for pos in open_tiles
+            if pos != start_pos and dist_from_start[pos[1]][pos[0]] < 9999
+        ]
+
+        if not reachable_distances:
+            return None
+
+        max_bfs_dist: int = max(reachable_distances)
+        target_min_dist: int = int(max_bfs_dist * difficulty_ratio)
+
+        valid_exits: List[Tuple[int, int]] = [
+            pos for pos in open_tiles
+            if pos != start_pos and
+            dist_from_start[pos[1]][pos[0]] >= target_min_dist
+            and dist_from_start[pos[1]][pos[0]] < 9999
+        ]
+
+        if not valid_exits:
+            return None
+
+        map_data.exit_pos = random.choice(valid_exits)
+
+        pathfinder: BFSPathfinder = BFSPathfinder(map_data)
+        pathfinder.compute_distance_matrix()
+
+        return map_data
+
+    def _generate_random_scatter_map(
+        self,
+        map_data: MapData,
+        wall_density: float
+    ) -> None:
+        """
+        Populates grid with random scattered wall layout.
+        """
+        for y in range(self.height):
+            for x in range(self.width):
+                if (
+                    x == 0 or x == self.width - 1 or
+                    y == 0 or y == self.height - 1
+                ):
+                    map_data.set_wall(x, y, True)
+                elif random.random() < wall_density:
+                    map_data.set_wall(x, y, True)
+
+    def _generate_branching_walls_map(
+        self,
+        map_data: MapData,
+        wall_density: float
+    ) -> None:
+        """
+        Grows organic branching wall structures extending from existing walls.
+        """
+        border_walls: Set[Tuple[int, int]] = set()
+        unrelated_walls: Set[Tuple[int, int]] = set()
+
+        for y in range(self.height):
+            for x in range(self.width):
+                if (
+                    x == 0 or x == self.width - 1 or
+                    y == 0 or y == self.height - 1
+                ):
+                    map_data.set_wall(x, y, True)
+                    border_walls.add((x, y))
+
+        inner_area: int = (self.width - 2) * (self.height - 2)
+        target_walls: int = int(inner_area * wall_density)
+        placed_count: int = 0
+        max_attempts: int = target_walls * 100
+
+        cardinal_dirs: List[Tuple[int, int]] = [
+            (0, -1), (0, 1), (-1, 0), (1, 0)
+        ]
+
+        active_stem: List[Tuple[int, int]] = []
+        current_dir: Tuple[int, int] = (0, 0)
+
+        attempts: int = 0
+        while placed_count < target_walls and attempts < max_attempts:
+            attempts += 1
+
+            if not active_stem:
+                # Phase 1: Seed a new wall branch off border or existing wall
+                seed_pool: List[Tuple[int, int]] = list(
+                    border_walls | unrelated_walls
+                )
+                if not seed_pool:
+                    break
+
+                seed_x, seed_y = random.choice(seed_pool)
+                dx, dy = random.choice(cardinal_dirs)
+
+                nx: int = seed_x + dx
+                ny: int = seed_y + dy
+
+                if not (1 <= nx < self.width - 1 and 1 <= ny < self.height - 1):
+                    continue
+
+                if map_data.is_wall(nx, ny):
+                    continue
+
+                if self._is_valid_seed_placement(
+                    nx, ny, seed_x, seed_y, border_walls, unrelated_walls
+                ):
+                    map_data.set_wall(nx, ny, True)
+                    active_stem.append((nx, ny))
+                    placed_count += 1
+                    current_dir = (dx, dy)
+
+            else:
+                # Phase 2: Extend active stem until naturally blocked
+                last_x, last_y = active_stem[-1]
+
+                # 70% chance straight, 30% chance 90 deg turn
+                if random.random() < 0.7:
+                    dx, dy = current_dir
+                else:
+                    dx, dy = random.choice(
+                        [(-current_dir[1], current_dir[0]),
+                         (current_dir[1], -current_dir[0])]
+                    )
+
+                nx = last_x + dx
+                ny = last_y + dy
+
+                if not (1 <= nx < self.width - 1 and 1 <= ny < self.height - 1):
+                    unrelated_walls.update(active_stem)
+                    active_stem.clear()
+                    continue
+
+                if map_data.is_wall(nx, ny):
+                    unrelated_walls.update(active_stem)
+                    active_stem.clear()
+                    continue
+
+                if self._is_valid_stem_extension(
+                    nx, ny, active_stem, border_walls, unrelated_walls
+                ):
+                    map_data.set_wall(nx, ny, True)
+                    active_stem.append((nx, ny))
+                    placed_count += 1
+                    current_dir = (dx, dy)
+                else:
+                    unrelated_walls.update(active_stem)
+                    active_stem.clear()
+
+        if active_stem:
+            unrelated_walls.update(active_stem)
+            active_stem.clear()
+
+    def _is_valid_seed_placement(
+        self,
+        nx: int,
+        ny: int,
+        seed_x: int,
+        seed_y: int,
+        border_walls: Set[Tuple[int, int]],
+        unrelated_walls: Set[Tuple[int, int]]
+    ) -> bool:
+        """
+        Validates first tile placement (C1) of a new branch next to anchor P.
+        """
+        seed_is_border: bool = (seed_x, seed_y) in border_walls
+
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                if dx == 0 and dy == 0:
+                    continue
+                bx: int = nx + dx
+                by: int = ny + dy
+
+                if seed_is_border:
+                    if (bx, by) in unrelated_walls:
+                        return False
+                    if (bx, by) in border_walls:
+                        if abs(bx - seed_x) > 1 or abs(by - seed_y) > 1:
+                            return False
+                else:
+                    if (bx, by) in border_walls:
+                        return False
+                    if (bx, by) in unrelated_walls:
+                        if abs(bx - seed_x) > 1 or abs(by - seed_y) > 1:
+                            return False
+
+        return True
+
+    def _is_valid_stem_extension(
+        self,
+        nx: int,
+        ny: int,
+        active_stem: List[Tuple[int, int]],
+        border_walls: Set[Tuple[int, int]],
+        unrelated_walls: Set[Tuple[int, int]]
+    ) -> bool:
+        """
+        Validates extending active stem tile including 90-degree turns.
+        """
+        allowed_stem: Set[Tuple[int, int]] = set(active_stem[-2:])
+
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                if dx == 0 and dy == 0:
+                    continue
+                bx: int = nx + dx
+                by: int = ny + dy
+
+                if (bx, by) in border_walls or (bx, by) in unrelated_walls:
+                    return False
+
+                if (bx, by) in active_stem and (bx, by) not in allowed_stem:
+                    return False
+
+        return True
+
+    def _flood_fill_region(
+        self,
+        start_node: Tuple[int, int],
+        map_data: MapData
+    ) -> Set[Tuple[int, int]]:
+        """
+        Discovers all walkable tiles reachable from a starting node.
+        """
+        visited: Set[Tuple[int, int]] = {start_node}
+        queue: deque[Tuple[int, int]] = deque([start_node])
+        cardinal_moves: List[Tuple[int, int]] = [
+            (0, -1), (0, 1), (-1, 0), (1, 0)
+        ]
+
+        while queue:
+            cx, cy = queue.popleft()
+            for dx, dy in cardinal_moves:
+                nx: int = cx + dx
+                ny: int = cy + dy
+                if map_data.is_walkable(nx, ny) and (nx, ny) not in visited:
+                    visited.add((nx, ny))
+                    queue.append((nx, ny))
+
+        return visited
+
+    def _compute_start_bfs(
+        self,
+        start_pos: Tuple[int, int],
+        map_data: MapData
+    ) -> Optional[List[List[int]]]:
+        """
+        Computes BFS step distance grid outward from start_pos.
+        """
+        unreachable_val: int = 9999
+        dist_grid: List[List[int]] = [
+            [unreachable_val for _ in range(self.width)]
+            for _ in range(self.height)
+        ]
+
+        sx, sy = start_pos
+        dist_grid[sy][sx] = 0
+
+        queue: deque[Tuple[int, int]] = deque([(sx, sy)])
+        cardinal_moves: List[Tuple[int, int]] = [
+            (0, -1), (0, 1), (-1, 0), (1, 0)
+        ]
+
+        while queue:
+            cx, cy = queue.popleft()
+            current_dist: int = dist_grid[cy][cx]
+
+            for dx, dy in cardinal_moves:
+                nx: int = cx + dx
+                ny: int = cy + dy
+                if map_data.is_walkable(nx, ny):
+                    if dist_grid[ny][nx] == unreachable_val:
+                        dist_grid[ny][nx] = current_dist + 1
+                        queue.append((nx, ny))
+
+        return dist_grid
+
+    def _build_fallback_map(self) -> MapData:
+        """
+        Constructs an open fallback map with border walls only.
+        """
+        start_pos: Tuple[int, int] = (1, 1)
+        exit_pos: Tuple[int, int] = (self.width - 2, self.height - 2)
+        map_data: MapData = MapData(
+            self.width, self.height, start_pos, exit_pos
+        )
+
+        for y in range(self.height):
+            for x in range(self.width):
+                if (
+                    x == 0 or x == self.width - 1 or
+                    y == 0 or y == self.height - 1
+                ):
+                    map_data.set_wall(x, y, True)
+
+        pathfinder: BFSPathfinder = BFSPathfinder(map_data)
+        pathfinder.compute_distance_matrix()
+        map_data.encode_bitmask()
+        return map_data
+
+
+--- FILE: ./core/pathfinder.py ---
+"""
+Breadth-First Search (BFS) pathfinding and distance matrix calculator.
+"""
+
+from collections import deque
+from typing import List, Tuple, Optional
+
+from core.map_data import MapData
+
+
+class BFSPathfinder:
+    """
+    Calculates exact topological step-distance matrices for grid maps.
+    """
+
+    def __init__(self, map_data: MapData) -> None:
+        """
+        Binds target map data instance.
+        """
+        self.map_data: MapData = map_data
+        self.distance_matrix: List[List[int]] = []
+
+    def compute_distance_matrix(self) -> Optional[List[List[int]]]:
+        """
+        Runs BFS backward from the exit tile to compute all distances.
+        """
+        width: int = self.map_data.width
+        height: int = self.map_data.height
+        unreachable_val: int = 9999
+        dist_grid: List[List[int]] = [
+            [unreachable_val for _ in range(width)] for _ in range(height)
+        ]
+
+        exit_x, exit_y = self.map_data.exit_pos
+        dist_grid[exit_y][exit_x] = 0
+
+        queue: deque[Tuple[int, int]] = deque([(exit_x, exit_y)])
+        cardinal_moves: List[Tuple[int, int]] = [
+            (0, -1), (0, 1), (-1, 0), (1, 0)
+        ]
+
+        while queue:
+            cx, cy = queue.popleft()
+            current_dist: int = dist_grid[cy][cx]
+
+            for dx, dy in cardinal_moves:
+                nx: int = cx + dx
+                ny: int = cy + dy
+
+                if self.map_data.is_walkable(nx, ny):
+                    if dist_grid[ny][nx] == unreachable_val:
+                        dist_grid[ny][nx] = current_dist + 1
+                        queue.append((nx, ny))
+
+        start_x, start_y = self.map_data.start_pos
+        if dist_grid[start_y][start_x] == unreachable_val:
+            return None
+
+        self.distance_matrix = dist_grid
+        return dist_grid
+
+    def get_step_distance(self, tile_x: int, tile_y: int) -> int:
+        """
+        Retrieves pre-computed step distance to exit in O(1) time.
+        """
+        if not self.distance_matrix:
+            return 9999
+
+        if (
+            tile_x < 0 or tile_x >= self.map_data.width or
+            tile_y < 0 or tile_y >= self.map_data.height
+        ):
+            return 9999
+
+        return self.distance_matrix[tile_y][tile_x]
+
+    def count_shortest_path_turns(self) -> int:
+        """
+        Traces shortest path from start to exit and counts 90-degree turns.
+        """
+        if not self.distance_matrix:
+            return 0
+
+        sx, sy = self.map_data.start_pos
+        ex, ey = self.map_data.exit_pos
+        if (sx, sy) == (ex, ey):
+            return 0
+
+        curr_x, curr_y = sx, sy
+        curr_dist: int = self.get_step_distance(curr_x, curr_y)
+        if curr_dist >= 9999:
+            return 0
+
+        cardinal_moves: List[Tuple[int, int]] = [
+            (0, -1), (0, 1), (-1, 0), (1, 0)
+        ]
+        turns: int = 0
+        last_dir: Optional[Tuple[int, int]] = None
+
+        while (curr_x, curr_y) != (ex, ey) and curr_dist > 0:
+            next_pos: Optional[Tuple[int, int]] = None
+            next_dir: Optional[Tuple[int, int]] = None
+
+            if last_dir is not None:
+                lx, ly = last_dir
+                tx, ty = curr_x + lx, curr_y + ly
+                if self.get_step_distance(tx, ty) == curr_dist - 1:
+                    next_pos = (tx, ty)
+                    next_dir = last_dir
+
+            if next_pos is None:
+                for dx, dy in cardinal_moves:
+                    tx, ty = curr_x + dx, curr_y + dy
+                    if self.get_step_distance(tx, ty) == curr_dist - 1:
+                        next_pos = (tx, ty)
+                        next_dir = (dx, dy)
+                        break
+
+            if next_pos is None or next_dir is None:
+                break
+
+            if last_dir is not None and next_dir != last_dir:
+                turns += 1
+
+            last_dir = next_dir
+            curr_x, curr_y = next_pos
+            curr_dist -= 1
+
+        return turns
+
+
+--- FILE: ./entities/__init__.py ---
+
+
+--- FILE: ./entities/player_express.py ---
+"""
+Candidate emotional state face expression engine.
+"""
+
+import config
+
+
+class PlayerExpress:
+    """
+    Determines ASCII face strings based on candidate physics states.
+    """
+
+    @staticmethod
+    def resolve_face(
+        has_reached_exit: bool,
+        has_collided: bool,
+        is_alive: bool
+    ) -> str:
+        """
+        Evaluates active physics flags to select ASCII expression.
+        """
+        if has_reached_exit:
+            return config.FACE_EXIT
+        if not is_alive:
+            return config.FACE_DEAD
+        if has_collided:
+            return config.FACE_WALL
+        return config.FACE_WALK
+
+
+--- FILE: ./entities/player_state.py ---
+"""
+Player candidate physical state tracking.
+"""
+
+from typing import Tuple
+
+
+class PlayerState:
+    """
+    Maintains individual candidate position, health, and progress stats.
+    """
+
+    def __init__(self, start_x: float, start_y: float) -> None:
+        """
+        Initializes candidate state at starting tile position.
+        """
+        self.x: float = start_x
+        self.y: float = start_y
+        self.heading: float = 0.0
+        self.best_step_dist: int = 9999
+        self.frames_survived: int = 0
+        self.has_collided: bool = False
+        self.has_reached_exit: bool = False
+        self.health: float = 1.0
+        self.is_alive: bool = True
+
+    @property
+    def tile_coords(self) -> Tuple[int, int]:
+        """
+        Returns integer grid coordinates for active candidate location.
+        """
+        return int(self.x), int(self.y)
+
+    def reset(self, start_x: float, start_y: float) -> None:
+        """
+        Resets state variables for new evaluation runs.
+        """
+        self.x = start_x
+        self.y = start_y
+        self.heading = 0.0
+        self.best_step_dist = 9999
+        self.frames_survived = 0
+        self.has_collided = False
+        self.has_reached_exit = False
+        self.health = 1.0
+        self.is_alive = True
+
+
+--- FILE: ./evolution/__init__.py ---
+
+
+--- FILE: ./evolution/fitness.py ---
+"""
+Continuous min-max fitness evaluation module for candidate ranking.
+"""
+
+from typing import List
+
+import config
+from entities.player_state import PlayerState
+
+
+class FitnessEvaluator:
+    """
+    Computes candidate raw scores and normalized fitness ratios.
+    """
+
+    @staticmethod
+    def calculate_raw_score(
+        state: PlayerState,
+        initial_bfs_dist: int,
+        max_steps: int = config.MAX_SIMULATION_STEPS,
+        move_speed: float = config.MOVE_SPEED,
+        dist_ratio: float = config.DIST_TO_TIME_BONUS_RATIO,
+        lost_hp_impact: float = config.LOST_HP_SCORE_IMPACT_RATIO
+    ) -> float:
+        """
+        Computes progress score plus time bonus weighted by health factor.
+        """
+        step_frames: float = 1.0 / max(1e-6, move_speed)
+        dist_reduced: float = float(initial_bfs_dist - state.best_step_dist)
+        bfs_progress_frames: float = max(0.0, dist_reduced * step_frames)
+        weighted_bfs_score: float = bfs_progress_frames * dist_ratio
+
+        if state.has_reached_exit:
+            time_bonus: float = float(max_steps - state.frames_survived)
+        else:
+            time_bonus = 0.0
+
+        raw_total: float = weighted_bfs_score + time_bonus
+
+        clamped_hp: float = max(0.0, min(1.0, state.health))
+        hp_factor: float = (1.0 - lost_hp_impact) + (
+            lost_hp_impact * clamped_hp
+        )
+
+        return raw_total * hp_factor
+
+    @staticmethod
+    def calculate_theoretical_max_score(
+        initial_bfs_dist: int,
+        max_steps: int = config.MAX_SIMULATION_STEPS,
+        move_speed: float = config.MOVE_SPEED,
+        dist_ratio: float = config.DIST_TO_TIME_BONUS_RATIO,
+        num_turns: int = 0,
+        corner_savings_per_turn: float = 0.586
+    ) -> float:
+        """
+        Returns theoretical max raw score for a perfect solver.
+
+        Corner savings reduce effective travel distance and minimum
+        frames, enlarging the time bonus. The BFS score component
+        uses the full initial_bfs_dist — matching calculate_raw_score
+        — so the ceiling is never breached by a real candidate.
+        """
+        step_frames: float = 1.0 / max(1e-6, move_speed)
+        turn_savings_tiles: float = (
+            float(num_turns) * corner_savings_per_turn
+        )
+        eff_bfs_dist: float = max(
+            0.0, float(initial_bfs_dist) - turn_savings_tiles
+        )
+        min_travel_frames: float = eff_bfs_dist * step_frames
+        max_bfs_score: float = (
+            float(initial_bfs_dist) * step_frames * dist_ratio
+        )
+        max_time_bonus: float = max(
+            0.0, float(max_steps) - min_travel_frames
+        )
+        return max_bfs_score + max_time_bonus
+
+    @staticmethod
+    def calculate_scaled_score(
+        raw_score: float,
+        theoretical_max: float
+    ) -> float:
+        """
+        Normalizes raw score to [0.0, 1000.0] range based on theoretical max.
+        """
+        if theoretical_max < 1e-6:
+            return 0.0
+
+        ratio: float = max(0.0, raw_score / theoretical_max)
+        return min(1000.0, ratio * 1000.0)
+
+    @staticmethod
+    def normalize_scores(raw_scores: List[float]) -> List[float]:
+        """
+        Normalizes a list of raw scores to [0.0, 1.0] ratios.
+        """
+        if not raw_scores:
+            return []
+
+        min_s: float = min(raw_scores)
+        max_s: float = max(raw_scores)
+        span: float = max_s - min_s
+
+        if span < 1e-6:
+            return [1.0 for _ in raw_scores]
+
+        return [(s - min_s) / span for s in raw_scores]
+
+
+--- FILE: ./evolution/population.py ---
+"""
+Batched neural network population manager and neuroevolution engine.
+"""
+
+import random
+from typing import List, Tuple, Optional
+import numpy as np
+from numpy.typing import NDArray
+
+import config
+
+
+class PopulationManager:
+    """
+    Owns batched MLP weight matrices and executes vectorized neuroevolution.
+    """
+
+    def __init__(
+        self,
+        pop_size: int = config.POPULATION_SIZE,
+        input_size: Optional[int] = None,
+        hidden_layers: int = config.NEURAL_HIDDEN_LAYERS,
+        neurons: int = config.NEURAL_NEURONS,
+        output_size: int = 2,
+        mutation_rate: float = config.MUTATION_RATE,
+        mutation_scale: float = config.MUTATION_SCALE,
+        elitism_ratio: float = config.ELITISM_RATIO
+    ) -> None:
+        """
+        Initializes evolution hyper-parameters and candidate weight stacks.
+        """
+        self.pop_size: int = pop_size
+        self.mutation_rate: float = mutation_rate
+        self.mutation_scale: float = mutation_scale
+        self.elitism_ratio: float = elitism_ratio
+
+        if input_size is None:
+            compass_ch: int = 2 if config.INCLUDE_COMPASS else 0
+            input_size = config.VISION_RAYS + compass_ch + 2
+
+        self.input_size: int = input_size
+        self.output_size: int = output_size
+        self.layer_sizes: List[int] = [neurons] * hidden_layers
+
+        self.sizes: List[int] = (
+            [input_size] + self.layer_sizes + [output_size]
+        )
+        self.weights: List[NDArray[np.float64]] = []
+        self.biases: List[NDArray[np.float64]] = []
+        self._init_weight_stacks()
+
+    def forward_batch(
+        self,
+        active_idx: List[int],
+        features: NDArray[np.float32]
+    ) -> Tuple[NDArray[np.float64], List[NDArray[np.float64]]]:
+        """
+        Executes batched forward pass over active candidates.
+        """
+        idx: NDArray[np.int64] = np.asarray(active_idx, dtype=np.int64)
+        x: NDArray[np.float64] = features.astype(np.float64, copy=False)
+
+        acts: List[NDArray[np.float64]] = [x]
+
+        for l_idx, (w, b) in enumerate(zip(self.weights, self.biases)):
+            x = np.einsum(
+                "ni,nij->nj", x, w[idx], optimize=False
+            ) + b[idx].squeeze(1)
+            acts.append(x)
+            if l_idx < len(self.layer_sizes):
+                x = np.maximum(0.0, x)
+
+        move_eff: NDArray[np.float64] = 1.0 / (
+            1.0 + np.exp(-np.clip(x[:, 0:1], -500.0, 500.0))
+        )
+        turn_eff: NDArray[np.float64] = np.tanh(x[:, 1:2])
+        outputs: NDArray[np.float64] = np.hstack([move_eff, turn_eff])
+
+        return outputs, acts
+
+    def evolve_next_generation(
+        self,
+        fitness_scores: List[float]
+    ) -> None:
+        """
+        Performs elitism, tournament selection, crossover, and mutation.
+        """
+        indexed_scores: List[Tuple[int, float]] = list(
+            enumerate(fitness_scores)
+        )
+        indexed_scores.sort(key=lambda item: item[1], reverse=True)
+
+        num_elites: int = max(1, int(self.pop_size * self.elitism_ratio))
+        elite_idx: List[int] = [
+            idx for idx, _ in indexed_scores[:num_elites]
+        ]
+
+        n_offspring: int = self.pop_size - num_elites
+        parent_a: NDArray[np.int64] = self._tournament_select(
+            fitness_scores, n_offspring
+        )
+        parent_b: NDArray[np.int64] = self._tournament_select(
+            fitness_scores, n_offspring
+        )
+
+        new_weights: List[NDArray[np.float64]] = []
+        new_biases: List[NDArray[np.float64]] = []
+
+        for l_idx in range(len(self.sizes) - 1):
+            elite_w: NDArray[np.float64] = (
+                self.weights[l_idx][elite_idx].copy()
+            )
+            elite_b: NDArray[np.float64] = (
+                self.biases[l_idx][elite_idx].copy()
+            )
+
+            wa: NDArray[np.float64] = self.weights[l_idx][parent_a]
+            wb: NDArray[np.float64] = self.weights[l_idx][parent_b]
+            ba: NDArray[np.float64] = self.biases[l_idx][parent_a]
+            bb: NDArray[np.float64] = self.biases[l_idx][parent_b]
+
+            mask_w: NDArray[np.bool_] = np.random.rand(*wa.shape) < 0.5
+            mask_b: NDArray[np.bool_] = np.random.rand(*ba.shape) < 0.5
+            child_w: NDArray[np.float64] = np.where(mask_w, wa, wb)
+            child_b: NDArray[np.float64] = np.where(mask_b, ba, bb)
+
+            mut_mask: NDArray[np.bool_] = (
+                np.random.rand(n_offspring, 1, 1) < self.mutation_rate
+            )
+            noise_w: NDArray[np.float64] = np.random.normal(
+                0.0, self.mutation_scale, child_w.shape
+            )
+            noise_b: NDArray[np.float64] = np.random.normal(
+                0.0, self.mutation_scale, child_b.shape
+            )
+
+            child_w += noise_w * mut_mask
+            child_b += noise_b * mut_mask
+
+            new_weights.append(np.concatenate([elite_w, child_w], axis=0))
+            new_biases.append(np.concatenate([elite_b, child_b], axis=0))
+
+        self.weights = new_weights
+        self.biases = new_biases
+
+    def _init_weight_stacks(self) -> None:
+        """
+        Builds batched Gaussian-initialized weight and bias matrices.
+        """
+        for fin, fout in zip(self.sizes[:-1], self.sizes[1:]):
+            scale: float = np.sqrt(2.0 / float(fin + fout))
+            weights: NDArray[np.float64] = scale * np.random.randn(
+                self.pop_size, fin, fout
+            )
+            biases: NDArray[np.float64] = np.zeros(
+                (self.pop_size, 1, fout), dtype=np.float64
+            )
+            self.weights.append(weights)
+            self.biases.append(biases)
+
+    def _tournament_select(
+        self,
+        scores: List[float],
+        count: int,
+        k: int = 3
+    ) -> NDArray[np.int64]:
+        """
+        Returns (count,) parent indices from k-way tournament sampling.
+        """
+        k = min(k, self.pop_size)
+        picks: NDArray[np.int64] = np.array([
+            random.sample(range(self.pop_size), k) for _ in range(count)
+        ])
+        cand_scores: NDArray[np.float64] = np.asarray(scores)[picks]
+        best: NDArray[np.int64] = cand_scores.argmax(axis=1)
+        return picks[np.arange(count), best]
+
+
+--- FILE: ./evolution/recorder.py ---
+"""
+In-memory frame recorder logging generation simulation histories for playback.
+"""
+
+from typing import List, Dict, Any
+import numpy as np
+
+from core.map_data import MapData
+
+
+class FrameRecorder:
+    """
+    Stores playback frame data and neural activations per generation.
+    """
+
+    def __init__(self) -> None:
+        """
+        Initializes generational history storage.
+        """
+        self.generations_history: List[Dict[str, Any]] = []
+
+    def record_generation(
+        self,
+        generation_index: int,
+        map_data: MapData,
+        candidate_frames: List[List[Dict[str, Any]]],
+        raw_scores: List[float],
+        normalized_scores: List[float]
+    ) -> None:
+        """
+        Stores recorded frame timelines and metrics for a generation.
+        """
+        gen_data: Dict[str, Any] = {
+            "generation": generation_index,
+            "bitmask_chunks": map_data.bitmask_chunks,
+            "start_pos": map_data.start_pos,
+            "exit_pos": map_data.exit_pos,
+            "map_width": map_data.width,
+            "map_height": map_data.height,
+            "candidate_frames": candidate_frames,
+            "raw_scores": raw_scores,
+            "normalized_scores": normalized_scores,
+            "winner_index": int(np.argmax(normalized_scores))
+        }
+        self.generations_history.append(gen_data)
+
+    def get_generation_data(self, gen_idx: int) -> Dict[str, Any]:
+        """
+        Retrieves recorded history data for a specific generation.
+        """
+        safe_idx: int = max(
+            0, min(gen_idx, len(self.generations_history) - 1)
+        )
+        return self.generations_history[safe_idx]
+
+
+--- FILE: ./evolution/trainer.py ---
+"""
+Headless CPU neuroevolution simulation trainer running batched candidates.
+"""
+
+import random
+import time
+import math
+from typing import Any, Dict, List, Optional, Tuple
+import numpy as np
+from numpy.typing import NDArray
+
+import config
+from core.kinematics import CandidateKinematics
+from core.map_data import MapData
+from core.map_generator import MapGenerator
+from core.pathfinder import BFSPathfinder
+from entities.player_express import PlayerExpress
+from entities.player_state import PlayerState
+from evolution.fitness import FitnessEvaluator
+from evolution.population import PopulationManager
+from evolution.recorder import FrameRecorder
+from perception.spatial_transformer import SpatialTransformer
+
+
+class HeadlessTrainer:
+    """
+    Coordinates headless training loops and frame timeline recording.
+    """
+
+    def __init__(
+        self,
+        pop_size: int = config.POPULATION_SIZE,
+        max_steps: int = config.MAX_SIMULATION_STEPS
+    ) -> None:
+        """
+        Initializes trainer components, bounds, and population matrices.
+        """
+        grid_capacity: int = config.GRID_ROWS * config.GRID_COLS
+        self.pop_size: int = min(pop_size, grid_capacity)
+        self.max_steps: int = max_steps
+
+        self.map_generator: MapGenerator = MapGenerator()
+        self.transformer: SpatialTransformer = SpatialTransformer()
+        self.kinematics: CandidateKinematics = CandidateKinematics()
+        self.recorder: FrameRecorder = FrameRecorder()
+
+        sample_map: MapData = self.map_generator.generate_solvable_map()
+        sample_features: NDArray[np.float32] = (
+            self.transformer.compile_feature_vector(
+                0.5, 0.5, 0.0, 1.0, 1.0, sample_map
+            )
+        )
+
+        self.input_size: int = int(sample_features.shape[0])
+        self.output_size: int = 2
+
+        self.population: PopulationManager = PopulationManager(
+            self.pop_size,
+            input_size=self.input_size,
+            output_size=self.output_size
+        )
+
+        self._wall_grid: Optional[NDArray[np.bool_]] = None
+        self._dist_grid: Optional[NDArray[np.int32]] = None
+
+    def run_training_session(
+        self,
+        num_generations: int = config.LEARNING_GENERATIONS
+    ) -> FrameRecorder:
+        """
+        Runs headless neuroevolution simulation across multiple generations.
+        """
+        print("\n=== CPU NEUROEVOLUTION SIMULATION ===")
+        print(
+            f"Population: {self.pop_size} | Max Steps: {self.max_steps} | "
+            f"Map Regime: {config.MAP_REGIME_GENERATIONS} gens max | "
+            f"Curriculum: {config.CURRICULUM_ENABLED}\n"
+        )
+
+        header_str: str = (
+            f"{'GEN':>7s} | {'TOP':>7s} | {'AVG':>7s} | {'WAY':>7s} | "
+            f"{'TARG':>7s} | {'FRAME':>7s} | {'EXITS':>7s} | {'TIME':>7s}"
+        )
+        print(header_str)
+        print("-" * len(header_str))
+
+        target_bfs: int = config.CURRICULUM_START_BFS
+        switch_next: bool = True
+        gens_on_map: int = 0
+        consecutive_failures: int = 0
+
+        map_data: Optional[MapData] = None
+        initial_bfs_dist: int = 0
+        theoretical_max: float = 0.0
+        spawn_headings: Optional[NDArray[np.float64]] = None
+
+        for gen_index in range(num_generations):
+            gen_start: float = time.perf_counter()
+            new_map: bool = switch_next
+
+            if switch_next:
+                (
+                    map_data,
+                    _pathfinder,
+                    initial_bfs_dist,
+                    _num_turns,
+                    theoretical_max,
+                    spawn_headings
+                ) = self._prepare_map(target_bfs)
+                switch_next = False
+                gens_on_map = 0
+
+            candidate_states, candidate_frames = self._simulate_generation(
+                map_data, initial_bfs_dist, spawn_headings
+            )
+
+            raw_scores: List[float] = [
+                FitnessEvaluator.calculate_raw_score(
+                    state, initial_bfs_dist, self.max_steps
+                )
+                for state in candidate_states
+            ]
+            scaled_scores: List[float] = [
+                FitnessEvaluator.calculate_scaled_score(
+                    score, theoretical_max
+                )
+                for score in raw_scores
+            ]
+            norm_scores: List[float] = FitnessEvaluator.normalize_scores(
+                raw_scores
+            )
+
+            self.recorder.record_generation(
+                gen_index,
+                map_data,
+                candidate_frames,
+                scaled_scores,
+                norm_scores
+            )
+
+            boost: float = config.REGIME_TRANSITION_MUTATION_BOOST
+            self.population.mutation_scale = (
+                config.MUTATION_SCALE * boost if new_map
+                else config.MUTATION_SCALE
+            )
+            self.population.evolve_next_generation(norm_scores)
+            self.population.mutation_scale = config.MUTATION_SCALE
+
+            gen_time: float = time.perf_counter() - gen_start
+            top_score: int = int(round(max(scaled_scores)))
+            avg_score: float = sum(scaled_scores) / float(len(scaled_scores))
+
+            solvers: List[Tuple[int, int]] = [
+                (c_idx, state.frames_survived)
+                for c_idx, state in enumerate(candidate_states)
+                if state.has_reached_exit
+            ]
+            solve_count: int = len(solvers)
+            solve_str: str = (str(solve_count) if solve_count > 0 else "-")
+            frame_str: str = (
+                str(min(steps for _, steps in solvers)) if solve_count > 0
+                else "-"
+            )
+            
+            exits_str: str = f"{solve_str}"
+            time_str: str = f"{gen_time:.2f}s"
+
+            row_str: str = (
+                f"{gen_index + 1:>7d} | {top_score:>7d} | "
+                f"{avg_score:>7.1f} | {initial_bfs_dist:>7d} | "
+                f"{target_bfs:>7d} | {frame_str:>7s} | "
+                f"{exits_str:>7s} | {time_str:>7s}"
+            )
+            print(row_str)
+
+            gens_on_map += 1
+            solved: bool = solve_count >= config.REGIME_SOLVE_TARGET
+
+            if solved and gens_on_map >= config.REGIME_MIN_GENERATIONS:
+                switch_next = True
+                target_bfs = min(
+                    target_bfs + config.CURRICULUM_BFS_STEP,
+                    config.CURRICULUM_MAX_BFS
+                )
+                consecutive_failures = 0
+
+            elif gens_on_map >= config.MAP_REGIME_GENERATIONS:
+                switch_next = True
+                if solved:
+                    target_bfs = min(
+                        target_bfs + config.CURRICULUM_BFS_STEP,
+                        config.CURRICULUM_MAX_BFS
+                    )
+                    consecutive_failures = 0
+                else:
+                    consecutive_failures += 1
+                    if (
+                        consecutive_failures >=
+                        config.CURRICULUM_FAILURES_BEFORE_EASE
+                    ):
+                        target_bfs = max(
+                            target_bfs - config.CURRICULUM_BFS_STEP,
+                            config.CURRICULUM_START_BFS
+                        )
+                        consecutive_failures = 0
+
+        print("-" * len(header_str))
+        print(
+            "CPU Training complete! Booting interactive visualizer GUI...\n"
+        )
+        return self.recorder
+
+    def _prepare_map(
+        self,
+        target_bfs: int
+    ) -> Tuple[
+        MapData,
+        BFSPathfinder,
+        int,
+        int,
+        float,
+        NDArray[np.float64]
+    ]:
+        """
+        Generates/prepares the active map and reusable lookup arrays.
+        """
+        if config.CURRICULUM_ENABLED:
+            map_data: MapData = self._generate_map_for_target(target_bfs)
+        else:
+            if config.MAP_DIFFICULTY_MIN >= config.MAP_DIFFICULTY_MAX:
+                difficulty: float = config.MAP_DIFFICULTY_MIN
+            else:
+                difficulty = random.uniform(
+                    config.MAP_DIFFICULTY_MIN, config.MAP_DIFFICULTY_MAX
+                )
+            map_data = self.map_generator.generate_solvable_map(
+                difficulty_ratio=difficulty
+            )
+
+        pathfinder: BFSPathfinder = BFSPathfinder(map_data)
+        pathfinder.compute_distance_matrix()
+
+        initial_bfs_dist: int = pathfinder.get_step_distance(
+            *map_data.start_pos
+        )
+        num_turns: int = pathfinder.count_shortest_path_turns()
+        theoretical_max: float = (
+            FitnessEvaluator.calculate_theoretical_max_score(
+                initial_bfs_dist, self.max_steps, num_turns=num_turns
+            )
+        )
+
+        spawn_headings: NDArray[np.float64] = np.asarray(
+            [
+                self.transformer.generate_random_heading(
+                    map_data, map_data.start_pos
+                )
+                for _ in range(self.pop_size)
+            ],
+            dtype=np.float64
+        )
+
+        self._wall_grid = np.asarray(
+            map_data.build_wall_grid(), dtype=np.bool_
+        )
+        self._dist_grid = np.asarray(
+            pathfinder.distance_matrix, dtype=np.int32
+        )
+
+        return (
+            map_data,
+            pathfinder,
+            initial_bfs_dist,
+            num_turns,
+            theoretical_max,
+            spawn_headings
+        )
+
+    def _generate_map_for_target(self, target_bfs: int) -> MapData:
+        """
+        Generates a solvable map close to the target curriculum distance.
+        """
+        minimum: int = max(2, target_bfs)
+        maximum: int = minimum + config.CURRICULUM_BFS_WINDOW
+
+        best_map: Optional[MapData] = None
+        best_delta: int = 1 << 30
+
+        for _ in range(config.CURRICULUM_MAP_ATTEMPTS):
+            map_data: MapData = self.map_generator.generate_solvable_map(
+                difficulty_ratio=config.CURRICULUM_DIFFICULTY_RATIO
+            )
+            pathfinder: BFSPathfinder = BFSPathfinder(map_data)
+            pathfinder.compute_distance_matrix()
+
+            distance: int = pathfinder.get_step_distance(*map_data.start_pos)
+            if minimum <= distance <= maximum:
+                return map_data
+
+            delta: int = (
+                minimum - distance if distance < minimum
+                else distance - maximum
+            )
+            if delta < best_delta:
+                best_delta = delta
+                best_map = map_data
+
+        if best_map is not None:
+            return best_map
+
+        return self.map_generator.generate_solvable_map()
+
+    def _simulate_generation(
+        self,
+        map_data: MapData,
+        initial_bfs_dist: int,
+        spawn_headings: NDArray[np.float64]
+    ) -> Tuple[List[PlayerState], List[List[Dict[str, Any]]]]:
+        """
+        Simulates the complete population using batched array operations.
+        """
+        n: int = self.pop_size
+        start_x, start_y = map_data.start_pos
+        exit_x, exit_y = map_data.exit_pos
+
+        wall_grid: NDArray[np.bool_] = self._wall_grid
+        dist_grid: NDArray[np.int32] = self._dist_grid
+        width, height = int(map_data.width), int(map_data.height)
+        move_speed: float = self.kinematics.move_speed
+
+        xs: NDArray[np.float64] = np.full(
+            n, float(start_x) + 0.5, dtype=np.float64
+        )
+        ys: NDArray[np.float64] = np.full(
+            n, float(start_y) + 0.5, dtype=np.float64
+        )
+        headings: NDArray[np.float64] = spawn_headings.copy()
+        healths: NDArray[np.float64] = np.ones(n, dtype=np.float64)
+        alive: NDArray[np.bool_] = np.ones(n, dtype=np.bool_)
+        reached_exit: NDArray[np.bool_] = np.zeros(n, dtype=np.bool_)
+        has_collided: NDArray[np.bool_] = np.zeros(n, dtype=np.bool_)
+        frames_survived: NDArray[np.int32] = np.zeros(n, dtype=np.int32)
+        best_dist: NDArray[np.int32] = np.full(
+            n, initial_bfs_dist, dtype=np.int32
+        )
+
+        cum_rotation: NDArray[np.float64] = np.zeros(
+            n, dtype=np.float64
+        )
+        stagnation_ticks: NDArray[np.int32] = np.zeros(
+            n, dtype=np.int32
+        )
+        spin_thresh_rad: float = math.radians(
+            config.SPIN_ANGLE_THRESHOLD_DEG
+        )
+        spin_reset_rad: float = math.radians(
+            config.SPIN_RESET_ANGLE_DEG
+        )
+        stagnation_limit: int = int(
+            self.max_steps * config.STAGNATION_TIMEOUT_RATIO
+        )
+
+        frame_x: NDArray[np.float64] = np.empty(
+            (self.max_steps, n), dtype=np.float64
+        )
+        frame_y: NDArray[np.float64] = np.empty_like(frame_x)
+        frame_heading: NDArray[np.float64] = np.empty_like(frame_x)
+        frame_health: NDArray[np.float64] = np.empty_like(frame_x)
+        frame_dist: NDArray[np.int32] = np.empty(
+            (self.max_steps, n), dtype=np.int32
+        )
+        frame_hit: NDArray[np.bool_] = np.empty(
+            (self.max_steps, n), dtype=np.bool_
+        )
+        frame_alive: NDArray[np.bool_] = np.empty(
+            (self.max_steps, n), dtype=np.bool_
+        )
+        frame_reached: NDArray[np.bool_] = np.empty(
+            (self.max_steps, n), dtype=np.bool_
+        )
+
+        activation_history: List[NDArray[np.float64]] = [
+            np.empty((self.max_steps, n, size), dtype=np.float64)
+            for size in self.population.sizes
+        ]
+
+        active: NDArray[np.bool_] = alive.copy()
+        steps_completed: int = 0
+        speeds: NDArray[np.float64] = np.full(
+            n, move_speed, dtype=np.float64
+        )
+
+        for step_idx in range(self.max_steps):
+            if not bool(active.any()):
+                break
+
+            active_idx: NDArray[np.int64] = np.flatnonzero(active)
+
+            features: NDArray[np.float32] = (
+                self.transformer.compile_feature_batch(
+                    xs[active_idx],
+                    ys[active_idx],
+                    headings[active_idx],
+                    speeds[active_idx],
+                    healths[active_idx],
+                    map_data,
+                    wall_grid
+                )
+            )
+
+            outputs, activations = self.population.forward_batch(
+                active_idx.tolist(), features
+            )
+
+            for a_idx, act in enumerate(activations):
+                activation_history[a_idx][step_idx, active_idx] = act
+
+            move_eff: NDArray[np.float64] = outputs[:, 0]
+            turn_eff: NDArray[np.float64] = outputs[:, 1]
+
+            (
+                new_x,
+                new_y,
+                new_heading,
+                hit,
+                stationary_turn
+            ) = self.kinematics.step_batch(
+                xs[active_idx],
+                ys[active_idx],
+                headings[active_idx],
+                move_eff,
+                turn_eff,
+                map_data,
+                wall_grid
+            )
+
+            old_x: NDArray[np.float64] = xs[active_idx].copy()
+            old_y: NDArray[np.float64] = ys[active_idx].copy()
+
+            heading_delta: NDArray[np.float64] = np.abs(
+                new_heading - headings[active_idx]
+            )
+            heading_delta = np.where(
+                heading_delta > math.pi,
+                (2.0 * math.pi) - heading_delta,
+                heading_delta
+            )
+            cum_rotation[active_idx] = np.where(
+                heading_delta >= spin_reset_rad,
+                cum_rotation[active_idx] + heading_delta,
+                0.0
+            )
+            stagnation_ticks[active_idx] += 1
+
+            xs[active_idx] = new_x
+            ys[active_idx] = new_y
+            headings[active_idx] = new_heading
+            has_collided[active_idx] = hit
+            frames_survived[active_idx] += 1
+
+            is_idle: NDArray[np.bool_] = (
+                (move_eff < config.HEALTH_IDLE_MOVE_THRESHOLD) |
+                (
+                    (np.abs(new_x - old_x) < 1e-4) &
+                    (np.abs(new_y - old_y) < 1e-4)
+                ) |
+                stationary_turn
+            )
+
+            active_hp: NDArray[np.float64] = healths[active_idx]
+            active_hp -= (
+                hit.astype(float) * config.HEALTH_COLL_DMG_PER_FRAME
+            )
+            active_hp -= (
+                is_idle.astype(float) *
+                config.HEALTH_IDLE_DMG_PER_FRAME
+            )
+
+            if config.SPIN_PENALTY_ENABLED:
+                is_spinning: NDArray[np.bool_] = (
+                    cum_rotation[active_idx] >= spin_thresh_rad
+                )
+                active_hp -= (
+                    is_spinning.astype(float) *
+                    config.SPIN_DMG_PER_FRAME
+                )
+
+            if config.STAGNATION_ENABLED:
+                is_stagnated: NDArray[np.bool_] = (
+                    stagnation_ticks[active_idx] >= stagnation_limit
+                )
+                active_hp -= (
+                    is_stagnated.astype(float) *
+                    config.STAGNATION_DMG_PER_FRAME
+                )
+
+            np.maximum(active_hp, 0.0, out=active_hp)
+            healths[active_idx] = active_hp
+
+            died: NDArray[np.bool_] = active_hp <= 0.0
+
+            tile_x: NDArray[np.int32] = np.floor(new_x).astype(
+                np.int32
+            )
+            tile_y: NDArray[np.int32] = np.floor(new_y).astype(
+                np.int32
+            )
+            inb: NDArray[np.bool_] = (
+                (tile_x >= 0) & (tile_x < width) &
+                (tile_y >= 0) & (tile_y < height)
+            )
+            safe_x: NDArray[np.int32] = np.clip(tile_x, 0, width - 1)
+            safe_y: NDArray[np.int32] = np.clip(tile_y, 0, height - 1)
+
+            current_dist: NDArray[np.int32] = np.where(
+                inb, dist_grid[safe_y, safe_x], 9999
+            ).astype(np.int32, copy=False)
+
+            prev_best: NDArray[np.int32] = best_dist[active_idx]
+            improved: NDArray[np.bool_] = current_dist < prev_best
+
+            if bool(improved.any()):
+                imp_idx: NDArray[np.int64] = active_idx[improved]
+                improvement: NDArray[np.float64] = (
+                    prev_best[improved] - current_dist[improved]
+                ).astype(np.float64)
+
+                stagnation_ticks[imp_idx] = 0
+
+                recovery: NDArray[np.float64] = (
+                    improvement *
+                    config.HEALTH_COLL_DMG_PER_FRAME *
+                    config.HEALTH_RECOVERY_RATIO
+                )
+                healths[imp_idx] = np.minimum(
+                    1.0, healths[imp_idx] + recovery
+                )
+                best_dist[imp_idx] = current_dist[improved]
+
+            reached_now: NDArray[np.bool_] = (
+                (tile_x == exit_x) & (tile_y == exit_y)
+            )
+            if bool(reached_now.any()):
+                reached_indices: NDArray[np.int64] = (
+                    active_idx[reached_now]
+                )
+                reached_exit[reached_indices] = True
+                active[reached_indices] = False
+
+            if bool(died.any()):
+                died_indices: NDArray[np.int64] = active_idx[died]
+                alive[died_indices] = False
+                active[died_indices] = False
+
+            frame_x[step_idx] = xs
+            frame_y[step_idx] = ys
+            frame_heading[step_idx] = headings
+            frame_health[step_idx] = healths
+
+            all_tx: NDArray[np.int32] = np.floor(xs).astype(np.int32)
+            all_ty: NDArray[np.int32] = np.floor(ys).astype(np.int32)
+            all_inb: NDArray[np.bool_] = (
+                (all_tx >= 0) & (all_tx < width) &
+                (all_ty >= 0) & (all_ty < height)
+            )
+            all_sx: NDArray[np.int32] = np.clip(all_tx, 0, width - 1)
+            all_sy: NDArray[np.int32] = np.clip(all_ty, 0, height - 1)
+
+            frame_dist[step_idx] = np.where(
+                all_inb, dist_grid[all_sy, all_sx], 9999
+            )
+            frame_hit[step_idx] = has_collided
+            frame_alive[step_idx] = alive
+            frame_reached[step_idx] = reached_exit
+            steps_completed = step_idx + 1
+
+        candidate_states: List[PlayerState] = []
+        for c_idx in range(n):
+            state: PlayerState = PlayerState(
+                float(xs[c_idx]), float(ys[c_idx])
+            )
+            state.heading = float(headings[c_idx])
+            state.health = float(healths[c_idx])
+            state.is_alive = bool(alive[c_idx])
+            state.has_reached_exit = bool(reached_exit[c_idx])
+            state.has_collided = bool(has_collided[c_idx])
+            state.frames_survived = int(frames_survived[c_idx])
+            state.best_step_dist = int(best_dist[c_idx])
+            candidate_states.append(state)
+
+        candidate_frames: List[List[Dict[str, Any]]] = [
+            [] for _ in range(n)
+        ]
+        for c_idx in range(n):
+            frames: List[Dict[str, Any]] = candidate_frames[c_idx]
+            for s_idx in range(steps_completed):
+                alive_val: bool = bool(frame_alive[s_idx, c_idx])
+                reached_val: bool = bool(frame_reached[s_idx, c_idx])
+                hit_val: bool = bool(frame_hit[s_idx, c_idx])
+
+                face: str = PlayerExpress.resolve_face(
+                    reached_val, hit_val, alive_val
+                )
+                activations: List[List[float]] = [
+                    activation_history[l_idx][s_idx, c_idx].tolist()
+                    for l_idx in range(len(activation_history))
+                ]
+
+                frames.append({
+                    "step": s_idx + 1,
+                    "x": float(frame_x[s_idx, c_idx]),
+                    "y": float(frame_y[s_idx, c_idx]),
+                    "heading": float(frame_heading[s_idx, c_idx]),
+                    "face": face,
+                    "hit_wall": hit_val,
+                    "health": float(frame_health[s_idx, c_idx]),
+                    "is_alive": alive_val,
+                    "reached_exit": reached_val,
+                    "dist": int(frame_dist[s_idx, c_idx]),
+                    "activations": activations
+                })
+
+        return candidate_states, candidate_frames
+
+
+--- FILE: ./perception/__init__.py ---
+
+
+--- FILE: ./perception/spatial_transformer.py ---
+"""
+Spatial feature compiler and candidate spawn heading randomizer.
+"""
+
+import math
+import random
+from typing import Optional, Tuple
+import numpy as np
+from numpy.typing import NDArray
+
+import config
+from core.map_data import MapData
+from perception.vision_arc import VisionArcSampler
+
+
+class SpatialTransformer:
+    """
+    Compiles sensory observations into normalized flat neural vectors.
+    """
+
+    def __init__(self) -> None:
+        """
+        Initializes internal vision arc sampler.
+        """
+        self.sampler: VisionArcSampler = VisionArcSampler()
+
+    @staticmethod
+    def generate_random_heading(
+        map_data: Optional[MapData] = None,
+        start_pos: Optional[Tuple[int, int]] = None,
+        max_attempts: int = 50
+    ) -> float:
+        """
+        Returns heading angle in radians, avoiding immediate wall face.
+        """
+        if map_data is None or start_pos is None:
+            return random.uniform(0.0, 2.0 * math.pi)
+
+        start_x, start_y = start_pos
+        center_x: float = float(start_x) + 0.5
+        center_y: float = float(start_y) + 0.5
+
+        for _ in range(max_attempts):
+            heading: float = random.uniform(0.0, 2.0 * math.pi)
+            probe_x: int = int(math.floor(center_x + math.cos(heading)))
+            probe_y: int = int(math.floor(center_y + math.sin(heading)))
+
+            if map_data.is_walkable(probe_x, probe_y):
+                return heading
+
+        return random.uniform(0.0, 2.0 * math.pi)
+
+    def compile_feature_vector(
+        self,
+        candidate_x: float,
+        candidate_y: float,
+        heading_rad: float,
+        current_speed: float,
+        health_ratio: float,
+        map_data: MapData
+    ) -> NDArray[np.float32]:
+        """
+        Samples wall rays and target compass into 9 to 13 feature channels.
+        """
+        wall_channels: NDArray[np.float32] = (
+            self.sampler.sample_vision_channels(
+                candidate_x, candidate_y, heading_rad, map_data
+            )
+        )
+
+        tg_left, tg_right = self._compute_stereo_compass(
+            candidate_x, candidate_y, heading_rad, map_data.exit_pos
+        )
+
+        if config.INCLUDE_COMPASS:
+            state_features: NDArray[np.float32] = np.array(
+                [tg_left, tg_right, current_speed, health_ratio],
+                dtype=np.float32
+            )
+        else:
+            state_features = np.array(
+                [current_speed, health_ratio], dtype=np.float32
+            )
+
+        return np.concatenate([wall_channels, state_features])
+
+    def compile_feature_batch(
+        self,
+        xs: NDArray[np.float64],
+        ys: NDArray[np.float64],
+        headings: NDArray[np.float64],
+        speeds: NDArray[np.float64],
+        healths: NDArray[np.float64],
+        map_data: MapData,
+        wall_grid: Optional[NDArray[np.bool_]] = None
+    ) -> NDArray[np.float32]:
+        """
+        Vectorized feature compiler for (N,) candidate states.
+        Returns a (N, channels) float32 feature matrix.
+        """
+        wall_channels: NDArray[np.float32] = (
+            self.sampler.sample_vision_channels_batch(
+                xs, ys, headings, map_data, wall_grid
+            )
+        )
+
+        tg_left, tg_right = self._compute_stereo_compass_batch(
+            xs, ys, headings, map_data.exit_pos
+        )
+
+        if config.INCLUDE_COMPASS:
+            state_features: NDArray[np.float32] = np.stack(
+                [tg_left, tg_right, speeds, healths], axis=1
+            ).astype(np.float32)
+        else:
+            state_features = np.stack(
+                [speeds, healths], axis=1
+            ).astype(np.float32)
+
+        return np.concatenate([wall_channels, state_features], axis=1)
+
+    def _compute_stereo_compass(
+        self,
+        cx: float,
+        cy: float,
+        heading: float,
+        exit_pos: Tuple[int, int]
+    ) -> Tuple[float, float]:
+        """
+        Computes TG-L and TG-R stereo binocular target compass channels.
+        """
+        ex: float = float(exit_pos[0]) + 0.5
+        ey: float = float(exit_pos[1]) + 0.5
+
+        dx: float = ex - cx
+        dy: float = ey - cy
+
+        target_angle: float = math.atan2(dy, dx)
+        angle_delta: float = (target_angle - heading) % (2.0 * math.pi)
+
+        if angle_delta > math.pi:
+            angle_delta -= 2.0 * math.pi
+
+        tg_left: float = 0.0
+        tg_right: float = 0.0
+
+        if -math.pi <= angle_delta <= 0.0:
+            tg_left = 1.0 - (abs(angle_delta) / math.pi)
+        if 0.0 <= angle_delta <= math.pi:
+            tg_right = 1.0 - (angle_delta / math.pi)
+
+        return max(0.0, min(1.0, tg_left)), max(0.0, min(1.0, tg_right))
+
+    def _compute_stereo_compass_batch(
+        self,
+        cxs: NDArray[np.float64],
+        cys: NDArray[np.float64],
+        headings: NDArray[np.float64],
+        exit_pos: Tuple[int, int]
+    ) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """
+        Vectorized stereo binocular target compass for (N,) headings.
+        """
+        ex: float = float(exit_pos[0]) + 0.5
+        ey: float = float(exit_pos[1]) + 0.5
+
+        dx: NDArray[np.float64] = ex - cxs
+        dy: NDArray[np.float64] = ey - cys
+
+        target_angle: NDArray[np.float64] = np.arctan2(dy, dx)
+        angle_delta: NDArray[np.float64] = (
+            target_angle - headings
+        ) % (2.0 * math.pi)
+        angle_delta = np.where(
+            angle_delta > math.pi, angle_delta - 2.0 * math.pi, angle_delta
+        )
+
+        tg_left: NDArray[np.float64] = np.where(
+            (angle_delta >= -math.pi) & (angle_delta <= 0.0),
+            1.0 - (np.abs(angle_delta) / math.pi),
+            0.0,
+        )
+        tg_right: NDArray[np.float64] = np.where(
+            (angle_delta >= 0.0) & (angle_delta <= math.pi),
+            1.0 - (angle_delta / math.pi),
+            0.0,
+        )
+
+        return (
+            np.clip(tg_left, 0.0, 1.0),
+            np.clip(tg_right, 0.0, 1.0),
+        )
+
+
+--- FILE: ./perception/vision_arc.py ---
+"""
+Grid-aligned DDA raycaster for wall proximity sensing.
+"""
+
+import math
+from typing import List, Tuple, Optional
+import numpy as np
+from numpy.typing import NDArray
+
+import config
+from core.map_data import MapData
+
+
+class VisionArcSampler:
+    """
+    Casts probe rays measuring wall tile proximity across visual arc.
+    """
+
+    def __init__(
+        self,
+        num_rays: int = config.VISION_RAYS,
+        arc_angle_deg: float = config.VISION_ARC_ANGLE,
+        max_dist: float = config.VISION_MAX_DIST
+    ) -> None:
+        """
+        Initializes relative ray angles across the visual arc.
+        """
+        self.num_rays: int = num_rays
+        self.max_dist: float = max_dist
+
+        half_arc: float = math.radians(arc_angle_deg / 2.0)
+        if num_rays > 1:
+            step: float = (2.0 * half_arc) / float(num_rays - 1)
+            self.relative_angles: List[float] = [
+                -half_arc + (i * step) for i in range(num_rays)
+            ]
+        else:
+            self.relative_angles = [0.0]
+
+    def sample_vision_channels(
+        self,
+        origin_x: float,
+        origin_y: float,
+        heading_rad: float,
+        map_data: MapData
+    ) -> NDArray[np.float32]:
+        """
+        Casts probe rays and returns a (VISION_RAYS,) wall proximity array.
+        """
+        channels: NDArray[np.float32] = np.zeros(
+            self.num_rays, dtype=np.float32
+        )
+
+        for i, rel_angle in enumerate(self.relative_angles):
+            ray_angle: float = heading_rad + rel_angle
+            wall_prox, _ = self._cast_single_ray(
+                origin_x, origin_y, ray_angle, map_data
+            )
+            channels[i] = wall_prox
+
+        return channels
+
+    def sample_vision_channels_batch(
+        self,
+        xs: NDArray[np.float64],
+        ys: NDArray[np.float64],
+        headings: NDArray[np.float64],
+        map_data: MapData,
+        wall_grid: Optional[NDArray[np.bool_]] = None
+    ) -> NDArray[np.float32]:
+        """
+        Vectorized Amanatides-Woo DDA across (N,) origins and headings.
+        Returns a (N, VISION_RAYS) float32 wall proximity array.
+        """
+        n_cands: int = int(xs.shape[0])
+        if n_cands == 0:
+            return np.zeros((0, self.num_rays), dtype=np.float32)
+
+        if wall_grid is None:
+            wall_grid = map_data.build_wall_grid()
+        h, w = wall_grid.shape
+
+        offsets: NDArray[np.float64] = np.asarray(
+            self.relative_angles, dtype=np.float64
+        )
+        angles: NDArray[np.float64] = headings[:, None] + offsets[None, :]
+        dir_x: NDArray[np.float64] = np.cos(angles).ravel()
+        dir_y: NDArray[np.float64] = np.sin(angles).ravel()
+
+        ox: NDArray[np.float64] = np.repeat(xs, self.num_rays)
+        oy: NDArray[np.float64] = np.repeat(ys, self.num_rays)
+
+        tile_x: NDArray[np.int64] = np.floor(ox).astype(np.int64)
+        tile_y: NDArray[np.int64] = np.floor(oy).astype(np.int64)
+
+        n_rays: int = int(ox.shape[0])
+        prox: NDArray[np.float64] = np.zeros(n_rays, dtype=np.float64)
+        done: NDArray[np.bool_] = np.zeros(n_rays, dtype=np.bool_)
+
+        inb: NDArray[np.bool_] = (
+            (tile_x >= 0) & (tile_x < w) & (tile_y >= 0) & (tile_y < h)
+        )
+        txc: NDArray[np.int64] = np.clip(tile_x, 0, w - 1)
+        tyc: NDArray[np.int64] = np.clip(tile_y, 0, h - 1)
+        inside_wall: NDArray[np.bool_] = inb & wall_grid[tyc, txc]
+        prox[inside_wall] = 1.0
+        done[inside_wall] = True
+
+        step_x: NDArray[np.int64] = np.where(
+            dir_x > 0.0, 1, np.where(dir_x < 0.0, -1, 0)
+        )
+        step_y: NDArray[np.int64] = np.where(
+            dir_y > 0.0, 1, np.where(dir_y < 0.0, -1, 0)
+        )
+
+        with np.errstate(divide="ignore", invalid="ignore"):
+            t_delta_x: NDArray[np.float64] = np.where(
+                np.abs(dir_x) > 1e-9, np.abs(1.0 / dir_x), np.inf
+            )
+            t_delta_y: NDArray[np.float64] = np.where(
+                np.abs(dir_y) > 1e-9, np.abs(1.0 / dir_y), np.inf
+            )
+            t_max_x: NDArray[np.float64] = np.where(
+                step_x > 0,
+                (tile_x + 1.0 - ox) / dir_x,
+                np.where(step_x < 0, (tile_x - ox) / dir_x, np.inf),
+            )
+            t_max_y: NDArray[np.float64] = np.where(
+                step_y > 0,
+                (tile_y + 1.0 - oy) / dir_y,
+                np.where(step_y < 0, (tile_y - oy) / dir_y, np.inf),
+            )
+
+        max_t: float = self.max_dist
+        max_iter: int = int(2.0 * max_t) + 4
+
+        for _ in range(max_iter):
+            active: NDArray[np.bool_] = ~done
+            if not bool(active.any()):
+                break
+
+            move_x: NDArray[np.bool_] = t_max_x < t_max_y
+            hit_t: NDArray[np.float64] = np.where(move_x, t_max_x, t_max_y)
+            tile_x = np.where(move_x, tile_x + step_x, tile_x)
+            tile_y = np.where(move_x, tile_y, tile_y + step_y)
+            t_max_x = np.where(move_x, t_max_x + t_delta_x, t_max_x)
+            t_max_y = np.where(move_x, t_max_y, t_max_y + t_delta_y)
+
+            no_hit: NDArray[np.bool_] = hit_t > max_t
+            prox = np.where(active & no_hit, 0.0, prox)
+            done |= active & no_hit
+
+            inb = (
+                (tile_x >= 0) & (tile_x < w) & (tile_y >= 0) & (tile_y < h)
+            )
+            txc = np.clip(tile_x, 0, w - 1)
+            tyc = np.clip(tile_y, 0, h - 1)
+            wall_hit: NDArray[np.bool_] = inb & wall_grid[tyc, txc]
+            blocked: NDArray[np.bool_] = active & ~no_hit & (wall_hit | ~inb)
+            prox = np.where(
+                blocked,
+                np.clip(1.0 - (hit_t / max_t), 0.0, 1.0),
+                prox,
+            )
+            done |= blocked
+
+        prox[~done] = 0.0
+        return prox.reshape(n_cands, self.num_rays).astype(np.float32)
+
+    def _cast_single_ray(
+        self,
+        ox: float,
+        oy: float,
+        angle_rad: float,
+        map_data: MapData
+    ) -> Tuple[float, float]:
+        """
+        Marches a single ray across grid cells via Amanatides-Woo DDA.
+        """
+        dir_x: float = math.cos(angle_rad)
+        dir_y: float = math.sin(angle_rad)
+
+        tile_x: int = int(math.floor(ox))
+        tile_y: int = int(math.floor(oy))
+
+        if map_data.is_wall(tile_x, tile_y):
+            return 1.0, 0.0
+
+        if abs(dir_x) < 1e-9:
+            step_x: int = 0
+            t_max_x: float = float("inf")
+            t_delta_x: float = float("inf")
+        else:
+            step_x = 1 if dir_x > 0.0 else -1
+            t_max_x = (
+                (tile_x + 1.0 - ox) / dir_x if step_x > 0
+                else (tile_x - ox) / dir_x
+            )
+            t_delta_x = abs(1.0 / dir_x)
+
+        if abs(dir_y) < 1e-9:
+            step_y: int = 0
+            t_max_y: float = float("inf")
+            t_delta_y: float = float("inf")
+        else:
+            step_y = 1 if dir_y > 0.0 else -1
+            t_max_y = (
+                (tile_y + 1.0 - oy) / dir_y if step_y > 0
+                else (tile_y - oy) / dir_y
+            )
+            t_delta_y = abs(1.0 / dir_y)
+
+        while True:
+            if t_max_x < t_max_y:
+                hit_t: float = t_max_x
+                tile_x += step_x
+                t_max_x += t_delta_x
+            else:
+                hit_t = t_max_y
+                tile_y += step_y
+                t_max_y += t_delta_y
+
+            if hit_t > self.max_dist:
+                return 0.0, 0.0
+
+            if map_data.is_wall(tile_x, tile_y):
+                return max(0.0, 1.0 - (hit_t / self.max_dist)), 0.0
+
+
+--- FILE: ./visualization/__init__.py ---
+
+
+--- FILE: ./visualization/network_graph.py ---
+"""
+Renders real-time neural network node activation graph with color shifts.
+"""
+
+from typing import Tuple, List, Dict, Any
+import pygame
+
+import config
+
+
+class NetworkGraph:
+    """
+    Renders activation graph topology (Input -> Hidden -> Output layers).
+    """
+
+    def __init__(
+        self,
+        rect: Tuple[int, int, int, int] = config.LAYOUT_GRAPH_RECT
+    ) -> None:
+        """
+        Initializes bounding rect and node display properties.
+        """
+        self.x, self.y, self.w, self.h = rect
+        self.font: pygame.font.Font = pygame.font.SysFont(
+            "monospace", config.HUD_GRAPH_FONT_SIZE, bold=True
+        )
+
+    def draw_graph(
+        self,
+        surface: pygame.Surface,
+        gen_data: Dict[str, Any],
+        cand_idx: int,
+        active_step: int
+    ) -> None:
+        """
+        Renders candidate neural layers with dark red to bright orange nodes.
+        """
+        pygame.draw.rect(
+            surface, config.COLOR_BG, (self.x, self.y, self.w, self.h)
+        )
+        pygame.draw.rect(
+            surface, config.COLOR_WALL_BORDER,
+            (self.x, self.y, self.w, self.h), 1
+        )
+
+        frames: List[Dict[str, Any]] = gen_data["candidate_frames"][cand_idx]
+        if not frames:
+            return
+
+        frame_idx: int = min(active_step, len(frames) - 1)
+        activations: List[List[float]] = frames[frame_idx]["activations"]
+
+        num_layers: int = len(activations)
+        if num_layers == 0:
+            return
+
+        col_spacing: float = float(self.w) / float(num_layers + 1)
+        node_radius: int = config.HUD_GRAPH_NODE_RADIUS
+        label_padding: int = config.HUD_GRAPH_LABEL_PADDING
+
+        for l_idx, layer_vals in enumerate(activations):
+            cx: int = int(self.x + ((l_idx + 1) * col_spacing))
+            num_nodes: int = len(layer_vals)
+            row_spacing: float = float(self.h - 40) / float(
+                max(1, num_nodes)
+            )
+
+            for n_idx, val in enumerate(layer_vals):
+                cy: int = int(self.y + 20 + (n_idx * row_spacing))
+
+                clamped_val: float = max(0.0, min(1.0, float(val)))
+                r: int = int(
+                    config.COLOR_NODE_INACTIVE[0] +
+                    clamped_val * (
+                        config.COLOR_NODE_ACTIVE[0] -
+                        config.COLOR_NODE_INACTIVE[0]
+                    )
+                )
+                g: int = int(
+                    config.COLOR_NODE_INACTIVE[1] +
+                    clamped_val * (
+                        config.COLOR_NODE_ACTIVE[1] -
+                        config.COLOR_NODE_INACTIVE[1]
+                    )
+                )
+                b: int = int(
+                    config.COLOR_NODE_INACTIVE[2] +
+                    clamped_val * (
+                        config.COLOR_NODE_ACTIVE[2] -
+                        config.COLOR_NODE_INACTIVE[2]
+                    )
+                )
+                node_color: Tuple[int, int, int] = (r, g, b)
+
+                pygame.draw.circle(
+                    surface, node_color, (cx, cy), node_radius
+                )
+                pygame.draw.circle(
+                    surface, config.COLOR_WALL_BORDER,
+                    (cx, cy), node_radius, 1
+                )
+
+                # Node shorthand labels
+                if l_idx == 0:
+                    lbl_text = self._get_input_shorthand(n_idx)
+                    lbl_surf = self.font.render(
+                        lbl_text, True, config.COLOR_PLAYER_HIGHLIGHT
+                    )
+                    lbl_rect = lbl_surf.get_rect(
+                        midleft=(cx + node_radius + label_padding, cy)
+                    )
+                    surface.blit(lbl_surf, lbl_rect)
+
+                elif l_idx == num_layers - 1:
+                    lbl_text = "MOVE" if n_idx == 0 else "TURN"
+                    lbl_surf = self.font.render(
+                        lbl_text, True, config.COLOR_PLAYER_HIGHLIGHT
+                    )
+                    lbl_rect = lbl_surf.get_rect(
+                        midleft=(cx + node_radius + label_padding, cy)
+                    )
+                    surface.blit(lbl_surf, lbl_rect)
+
+        # Layer title labels below graph
+        labels: List[str] = ["INPUT"] + [
+            f"HIDDEN {i+1}" for i in range(num_layers - 2)
+        ] + ["OUTPUT"]
+
+        for l_idx, label in enumerate(labels):
+            cx = int(self.x + ((l_idx + 1) * col_spacing))
+            lbl_surf = self.font.render(
+                label, True, config.COLOR_PLAYER_HIGHLIGHT
+            )
+            lbl_rect = lbl_surf.get_rect(
+                center=(cx, self.y + self.h - 10)
+            )
+            surface.blit(lbl_surf, lbl_rect)
+
+    def _get_input_shorthand(self, node_idx: int) -> str:
+        """
+        Generates shorthand labels for Wall Rays, TG-L, TG-R, SPD, and HP inputs.
+        """
+        num_rays: int = config.VISION_RAYS
+        half_arc: float = config.VISION_ARC_ANGLE / 2.0
+
+        if node_idx < num_rays:
+            step: float = (2.0 * half_arc) / float(max(1, num_rays - 1))
+            deg: int = int(round(-half_arc + (node_idx * step)))
+            return f"{deg:+d}°"
+
+        elif node_idx == num_rays:
+            return "TG-L"
+
+        elif node_idx == num_rays + 1:
+            return "TG-R"
+
+        elif node_idx == num_rays + 2:
+            return "SPD"
+
+        return "HP"
+
+
+--- FILE: ./visualization/overlay_panel.py ---
+"""
+Renders header title, telemetry dashboard, and active candidate information.
+"""
+
+from typing import Tuple, Dict, Any, List
+import pygame
+
+import config
+
+
+class OverlayPanel:
+    """
+    Renders dashboard headers, active scores, and winner callouts in 2 columns.
+    """
+
+    def __init__(
+        self,
+        rect: Tuple[int, int, int, int] = config.LAYOUT_PANEL_RECT
+    ) -> None:
+        """
+        Initializes bounding rect and font properties.
+        """
+        self.x, self.y, self.w, self.h = rect
+        self.title_font: pygame.font.Font = pygame.font.SysFont(
+            "monospace", config.HUD_PANEL_TITLE_FONT_SIZE, bold=True
+        )
+        self.body_font: pygame.font.Font = pygame.font.SysFont(
+            "monospace", config.HUD_PANEL_BODY_FONT_SIZE, bold=True
+        )
+
+    def draw_panel(
+        self,
+        surface: pygame.Surface,
+        gen_data: Dict[str, Any],
+        active_cand_idx: int,
+        active_step: int,
+        total_steps: int,
+        total_gens: int
+    ) -> None:
+        """
+        Renders title header and 2-column scaled dashboard metrics.
+        """
+        pygame.draw.rect(
+            surface, config.COLOR_BG, (self.x, self.y, self.w, self.h)
+        )
+        pygame.draw.rect(
+            surface, config.COLOR_WALL_BORDER,
+            (self.x, self.y, self.w, self.h), 1
+        )
+
+        # Title header in Light Blue
+        title_text: str = "PYVORENNDRO 2D - NEUROEVOLUTION"
+        title_surf = self.title_font.render(
+            title_text, True, config.COLOR_START
+        )
+        surface.blit(title_surf, (self.x + 12, self.y + 10))
+
+        gen_num: int = gen_data["generation"] + 1
+        raw_scores: List[float] = gen_data["raw_scores"]
+        top_score: float = max(raw_scores)
+        avg_score: float = sum(raw_scores) / float(len(raw_scores))
+        winner_idx: int = gen_data["winner_index"]
+        max_f: int = total_frames_limit(gen_data)
+
+        # Column X coordinates and Row Y coordinates
+        col1_x: int = self.x + 12
+        col2_x: int = self.x + 215
+        row_y1: int = self.y + 40
+        row_y2: int = self.y + 70
+        row_y3: int = self.y + 100
+
+        # Left Column Metrics
+        lbl_sel = self.body_font.render(
+            f"SELECTED : #{active_cand_idx}",
+            True,
+            config.COLOR_PLAYER_HIGHLIGHT
+        )
+        surface.blit(lbl_sel, (col1_x, row_y1))
+
+        lbl_step = self.body_font.render(
+            f"FRAME STEP: {active_step}/{max_f}",
+            True,
+            (255, 255, 255)
+        )
+        surface.blit(lbl_step, (col1_x, row_y2))
+
+        lbl_gen = self.body_font.render(
+            f"GENERATION: {gen_num}/{total_gens}",
+            True,
+            (255, 255, 255)
+        )
+        surface.blit(lbl_gen, (col1_x, row_y3))
+
+        # Right Column Metrics
+        lbl_win = self.body_font.render(
+            f"WINNER   : #{winner_idx}",
+            True,
+            config.COLOR_EXIT
+        )
+        surface.blit(lbl_win, (col2_x, row_y1))
+
+        lbl_top = self.body_font.render(
+            f"TOP SCORE : {top_score:.1f}",
+            True,
+            config.COLOR_EXIT
+        )
+        surface.blit(lbl_top, (col2_x, row_y2))
+
+        lbl_avg = self.body_font.render(
+            f"AVG SCORE : {avg_score:.1f}",
+            True,
+            (200, 200, 200)
+        )
+        surface.blit(lbl_avg, (col2_x, row_y3))
+
+
+def total_frames_limit(gen_data: Dict[str, Any]) -> int:
+    """
+    Returns max frames recorded across all candidates in a generation.
+    """
+    frames_list = gen_data["candidate_frames"]
+    if not frames_list:
+        return 0
+    return max(len(c_frames) for c_frames in frames_list)
+
+
+--- FILE: ./visualization/timeline_scrubber.py ---
+"""
+Interactive UI transport controls, dual timeline bars, and marker tags.
+"""
+
+from typing import Tuple, List, Optional, Dict, Any
+import pygame
+
+import config
+
+
+class TimelineScrubber:
+    """
+    Renders Play/Pause/Repeat/Speed buttons, dual timelines, and markers.
+    """
+
+    def __init__(
+        self,
+        rect: Tuple[int, int, int, int] = config.LAYOUT_SCRUBBER_RECT
+    ) -> None:
+        """
+        Initializes transport buttons, timeline bar rects, and state flags.
+        """
+        self.x, self.y, self.w, self.h = rect
+        self.is_playing: bool = True
+        self.repeat_all: bool = True  # True = REP ALL, False = REP 1
+        self.playback_speed: int = config.DEFAULT_PLAYBACK_SPEED
+        self.speed_options: List[int] = [1, 2, 4, 8, 16]
+
+        btn_h: int = config.HUD_SCRUBBER_BTN_HEIGHT
+        self.btn_toggle_rect: pygame.Rect = pygame.Rect(
+            self.x, self.y, 70, btn_h
+        )
+        self.btn_repeat_rect: pygame.Rect = pygame.Rect(
+            self.x + 75, self.y, 70, btn_h
+        )
+        self.btn_speed_rect: pygame.Rect = pygame.Rect(
+            self.x + 150, self.y, 50, btn_h
+        )
+
+        bar_x: int = self.x + 210
+        bar_w: int = self.w - 210
+        bar_h: int = config.HUD_SCRUBBER_BAR_HEIGHT
+        self.frame_bar_rect: pygame.Rect = pygame.Rect(
+            bar_x, self.y, bar_w, bar_h
+        )
+        self.gen_bar_rect: pygame.Rect = pygame.Rect(
+            bar_x, self.y + bar_h + 8, bar_w, bar_h
+        )
+
+        self.font: pygame.font.Font = pygame.font.SysFont(
+            "monospace", config.HUD_SCRUBBER_BTN_FONT_SIZE, bold=True
+        )
+
+    def draw_controls(
+        self,
+        surface: pygame.Surface,
+        active_gen: int,
+        total_gens: int,
+        active_frame: int,
+        total_frames: int,
+        gen_history: Optional[List[Dict[str, Any]]] = None,
+        selected_cand_frames: Optional[List[Dict[str, Any]]] = None
+    ) -> None:
+        """
+        Renders transport buttons, dual timeline bars, and marker tick tags.
+        """
+        # Play / Pause toggle button
+        t_color = (
+            config.COLOR_BUTTON_ACTIVE if self.is_playing
+            else config.COLOR_BUTTON
+        )
+        pygame.draw.rect(surface, t_color, self.btn_toggle_rect)
+        pygame.draw.rect(
+            surface, config.COLOR_WALL_BORDER, self.btn_toggle_rect, 1
+        )
+        t_str: str = "PAUSE" if self.is_playing else "PLAY"
+        t_lbl = self.font.render(t_str, True, (255, 255, 255))
+        surface.blit(
+            t_lbl, t_lbl.get_rect(center=self.btn_toggle_rect.center)
+        )
+
+        # Repeat mode button (REP ALL / REP 1)
+        r_color = (
+            config.COLOR_BUTTON_ACTIVE if self.repeat_all
+            else config.COLOR_BUTTON
+        )
+        pygame.draw.rect(surface, r_color, self.btn_repeat_rect)
+        pygame.draw.rect(
+            surface, config.COLOR_WALL_BORDER, self.btn_repeat_rect, 1
+        )
+        r_str: str = "REP ALL" if self.repeat_all else "REP 1"
+        r_lbl = self.font.render(r_str, True, (255, 255, 255))
+        surface.blit(
+            r_lbl, r_lbl.get_rect(center=self.btn_repeat_rect.center)
+        )
+
+        # Speed toggle button
+        pygame.draw.rect(surface, config.COLOR_BUTTON, self.btn_speed_rect)
+        pygame.draw.rect(
+            surface, config.COLOR_WALL_BORDER, self.btn_speed_rect, 1
+        )
+        sp_lbl = self.font.render(
+            f"{self.playback_speed}x", True, (255, 255, 255)
+        )
+        surface.blit(
+            sp_lbl, sp_lbl.get_rect(center=self.btn_speed_rect.center)
+        )
+
+        # Timeline Bars
+        pygame.draw.rect(
+            surface, config.COLOR_TIMELINE_BAR, self.frame_bar_rect
+        )
+        pygame.draw.rect(
+            surface, config.COLOR_TIMELINE_BAR, self.gen_bar_rect
+        )
+
+        # Draw green solve tick marks on generation timeline bar
+        if gen_history:
+            for g_idx, g_data in enumerate(gen_history):
+                c_frames_list = g_data.get("candidate_frames", [])
+                solved_gen: bool = any(
+                    len(cf) > 0 and cf[-1].get("reached_exit", False)
+                    for cf in c_frames_list
+                )
+                if solved_gen:
+                    g_r: float = float(g_idx) / float(
+                        max(1, total_gens - 1)
+                    )
+                    gx: int = int(
+                        self.gen_bar_rect.x + (g_r * self.gen_bar_rect.w)
+                    )
+                    pygame.draw.line(
+                        surface,
+                        config.COLOR_EXIT,
+                        (gx, self.gen_bar_rect.top),
+                        (gx, self.gen_bar_rect.bottom),
+                        2
+                    )
+
+        # Draw green finish tick mark on frame bar for selected candidate
+        if selected_cand_frames:
+            for f_step, f_dict in enumerate(selected_cand_frames):
+                if f_dict.get("reached_exit", False):
+                    f_r: float = float(f_step) / float(
+                        max(1, total_frames - 1)
+                    )
+                    fx: int = int(
+                        self.frame_bar_rect.x + (f_r * self.frame_bar_rect.w)
+                    )
+                    pygame.draw.line(
+                        surface,
+                        config.COLOR_EXIT,
+                        (fx, self.frame_bar_rect.top),
+                        (fx, self.frame_bar_rect.bottom),
+                        2
+                    )
+                    break
+
+        marker_r: int = config.HUD_SCRUBBER_MARKER_RADIUS
+
+        # Frame Timeline Marker
+        f_ratio: float = (
+            float(active_frame) / float(max(1, total_frames - 1))
+        )
+        f_marker_x: int = int(
+            self.frame_bar_rect.x + (f_ratio * self.frame_bar_rect.w)
+        )
+        f_marker_center: Tuple[int, int] = (
+            f_marker_x, self.frame_bar_rect.centery
+        )
+        pygame.draw.circle(
+            surface, config.COLOR_MARKER, f_marker_center, marker_r
+        )
+
+        f_lbl = self.font.render(
+            f"# {active_frame}", True, config.COLOR_MARKER
+        )
+        surface.blit(f_lbl, (f_marker_x - 12, self.frame_bar_rect.y - 14))
+
+        # Generation Timeline Marker
+        g_ratio: float = (
+            float(active_gen) / float(max(1, total_gens - 1))
+        )
+        g_marker_x: int = int(
+            self.gen_bar_rect.x + (g_ratio * self.gen_bar_rect.w)
+        )
+        g_marker_center: Tuple[int, int] = (
+            g_marker_x, self.gen_bar_rect.centery
+        )
+        pygame.draw.circle(
+            surface, config.COLOR_MARKER, g_marker_center, marker_r
+        )
+
+        g_lbl = self.font.render(
+            f"# {active_gen + 1}", True, config.COLOR_MARKER
+        )
+        surface.blit(g_lbl, (g_marker_x - 12, self.gen_bar_rect.y + 18))
+
+    def handle_click(
+        self,
+        click_pos: Tuple[int, int],
+        total_gens: int,
+        total_frames: int,
+        mouse_button: int = 1
+    ) -> Tuple[Optional[int], Optional[int]]:
+        """
+        Processes transport button clicks and dual timeline bar scrubbing.
+        """
+        cx, cy = click_pos
+
+        if self.btn_toggle_rect.collidepoint(cx, cy):
+            self.is_playing = not self.is_playing
+            return None, None
+
+        if self.btn_repeat_rect.collidepoint(cx, cy):
+            self.repeat_all = not self.repeat_all
+            return None, None
+
+        if self.btn_speed_rect.collidepoint(cx, cy):
+            curr_idx: int = self.speed_options.index(self.playback_speed)
+            if mouse_button == 3:  # Right Click = Speed Down
+                next_idx: int = (curr_idx - 1) % len(self.speed_options)
+            else:  # Left Click / Default = Speed Up
+                next_idx = (curr_idx + 1) % len(self.speed_options)
+            self.playback_speed = self.speed_options[next_idx]
+            return None, None
+
+        new_frame: Optional[int] = None
+        new_gen: Optional[int] = None
+
+        if self.frame_bar_rect.collidepoint(cx, cy):
+            rel_x: float = float(cx - self.frame_bar_rect.x)
+            ratio: float = max(
+                0.0, min(1.0, rel_x / float(self.frame_bar_rect.w))
+            )
+            new_frame = int(round(ratio * (total_frames - 1)))
+
+        if self.gen_bar_rect.collidepoint(cx, cy):
+            rel_x = float(cx - self.gen_bar_rect.x)
+            ratio = max(0.0, min(1.0, rel_x / float(self.gen_bar_rect.w)))
+            new_gen = int(round(ratio * (total_gens - 1)))
+
+        return new_gen, new_frame
+
+
+--- FILE: ./visualization/viewport_grid.py ---
+"""
+Renders self-adjusting candidate viewport grid and candidate zoom mode.
+"""
+
+import math
+from typing import Tuple, Dict, Any, List, Optional
+import pygame
+
+import config
+from core.map_data import MapData
+from perception.vision_arc import VisionArcSampler
+
+
+class ViewportGrid:
+    """
+    Renders candidate grid viewports, single-click selection, & zoom mode.
+    """
+
+    def __init__(
+        self,
+        rect: Tuple[int, int, int, int] = config.LAYOUT_GRID_RECT,
+        rows: int = config.GRID_ROWS,
+        cols: int = config.GRID_COLS
+    ) -> None:
+        """
+        Initializes viewport rect, grid bounds, font cache, & surface buffers.
+        """
+        self.x, self.y, self.w, self.h = rect
+        self.rows: int = max(1, min(8, rows))
+        self.cols: int = max(1, min(8, cols))
+        self.selected_idx: int = 0
+        self.is_zoomed: bool = False
+        self.is_player_centered: bool = False
+        self.sampler: VisionArcSampler = VisionArcSampler()
+
+        self._font_cache: Dict[int, pygame.font.Font] = {}
+        self._map_cache: Dict[Tuple[int, int, int], pygame.Surface] = {}
+        self._arc_scratchpad: pygame.Surface = pygame.Surface(
+            (self.w, self.h), pygame.SRCALPHA
+        )
+
+    def toggle_camera_mode(self) -> None:
+        """
+        Toggles between Map-Centered and Player-Centered tracking views.
+        """
+        self.is_player_centered = not self.is_player_centered
+
+    def draw_grid(
+        self,
+        surface: pygame.Surface,
+        gen_data: Dict[str, Any],
+        active_step: int
+    ) -> None:
+        """
+        Renders sub-viewports for all candidate maps or single zoomed view.
+        """
+        map_w: int = gen_data.get(
+            "map_width", gen_data.get("map_size", 20)
+        )
+        map_h: int = gen_data.get(
+            "map_height", gen_data.get("map_size", 20)
+        )
+        map_data: MapData = MapData(
+            map_w, map_h, gen_data["start_pos"], gen_data["exit_pos"]
+        )
+        map_data.decode_bitmask(gen_data["bitmask_chunks"])
+
+        if self.is_zoomed:
+            self._draw_single_candidate_viewport(
+                surface,
+                map_data,
+                gen_data,
+                self.selected_idx,
+                active_step,
+                (self.x, self.y, self.w, self.h),
+                is_selected=True
+            )
+            return
+
+        sub_w: int = self.w // self.cols
+        sub_h: int = self.h // self.rows
+
+        for row in range(self.rows):
+            for col in range(self.cols):
+                idx: int = (row * self.cols) + col
+                cand_frames = gen_data["candidate_frames"]
+                if idx >= len(cand_frames):
+                    continue
+
+                sub_rect: Tuple[int, int, int, int] = (
+                    self.x + (col * sub_w),
+                    self.y + (row * sub_h),
+                    sub_w,
+                    sub_h
+                )
+                is_sel: bool = (idx == self.selected_idx)
+                self._draw_single_candidate_viewport(
+                    surface,
+                    map_data,
+                    gen_data,
+                    idx,
+                    active_step,
+                    sub_rect,
+                    is_selected=is_sel
+                )
+
+    def handle_click(
+        self,
+        click_pos: Tuple[int, int],
+        is_double_click: bool = False
+    ) -> bool:
+        """
+        Processes single-click selection and double-click zoom toggles.
+        """
+        cx, cy = click_pos
+        if not (
+            self.x <= cx <= self.x + self.w and
+            self.y <= cy <= self.y + self.h
+        ):
+            return False
+
+        if self.is_zoomed:
+            if is_double_click:
+                self.is_zoomed = False
+            return True
+
+        sub_w: int = self.w // self.cols
+        sub_h: int = self.h // self.rows
+
+        col: int = (cx - self.x) // sub_w
+        row: int = (cy - self.y) // sub_h
+
+        col = max(0, min(self.cols - 1, col))
+        row = max(0, min(self.rows - 1, row))
+
+        clicked_idx: int = (row * self.cols) + col
+        self.selected_idx = clicked_idx
+
+        if is_double_click:
+            self.is_zoomed = True
+
+        return True
+
+    def _get_cached_font(self, font_size: int) -> pygame.font.Font:
+        """
+        Retrieves cached font instance or creates new one for point size.
+        """
+        if font_size in self._font_cache:
+            return self._font_cache[font_size]
+
+        font: pygame.font.Font = pygame.font.SysFont(
+            "monospace", font_size, bold=True
+        )
+        self._font_cache[font_size] = font
+        return font
+
+    def _get_rendered_map_surface(
+        self,
+        map_data: MapData,
+        gen_idx: int,
+        rw: int,
+        rh: int
+    ) -> pygame.Surface:
+        """
+        Retrieves cached pre-rendered map surface or renders background once.
+        """
+        cache_key: Tuple[int, int, int] = (gen_idx, rw, rh)
+        if cache_key in self._map_cache:
+            return self._map_cache[cache_key]
+
+        map_surf: pygame.Surface = pygame.Surface((rw, rh))
+        map_surf.fill(config.COLOR_BG)
+
+        tile_size: float = min(
+            float(rw) / float(map_data.width),
+            float(rh) / float(map_data.height)
+        )
+
+        for y in range(map_data.height):
+            for x in range(map_data.width):
+                t_x: int = int(float(x) * tile_size)
+                t_y: int = int(float(y) * tile_size)
+                t_rect: Tuple[int, int, int, int] = (
+                    t_x, t_y, int(tile_size) + 1, int(tile_size) + 1
+                )
+
+                if (x, y) == map_data.start_pos:
+                    pygame.draw.rect(map_surf, config.COLOR_START, t_rect)
+                elif (x, y) == map_data.exit_pos:
+                    pygame.draw.rect(map_surf, config.COLOR_EXIT, t_rect)
+                elif map_data.is_wall(x, y):
+                    pygame.draw.rect(map_surf, config.COLOR_WALL, t_rect)
+                    pygame.draw.rect(
+                        map_surf, config.COLOR_WALL_BORDER, t_rect, 1
+                    )
+                else:
+                    pygame.draw.rect(map_surf, config.COLOR_FLOOR, t_rect)
+                    pygame.draw.rect(
+                        map_surf, config.COLOR_FLOOR_BORDER, t_rect, 1
+                    )
+
+        self._map_cache[cache_key] = map_surf
+        return map_surf
+
+    def _draw_single_candidate_viewport(
+        self,
+        surface: pygame.Surface,
+        map_data: MapData,
+        gen_data: Dict[str, Any],
+        cand_idx: int,
+        active_step: int,
+        rect: Tuple[int, int, int, int],
+        is_selected: bool
+    ) -> None:
+        """
+        Renders a single candidate sub-viewport with vision arc and body.
+        """
+        rx, ry, rw, rh = rect
+
+        frames: List[Dict[str, Any]] = gen_data["candidate_frames"][cand_idx]
+        if not frames:
+            return
+
+        frame_idx: int = min(active_step, len(frames) - 1)
+        curr_frame: Dict[str, Any] = frames[frame_idx]
+
+        clip_rect = pygame.Rect(rx, ry, rw, rh)
+        surface.set_clip(clip_rect)
+
+        pygame.draw.rect(surface, config.COLOR_BG, rect)
+
+        if self.is_zoomed:
+            base_sub_w: float = float(self.w) / float(self.cols)
+            ui_scale: float = (float(rw) / base_sub_w) * 0.5
+        else:
+            ui_scale = 1.0
+
+        font_norm = self._get_cached_font(max(10, int(12 * ui_scale)))
+        font_small = self._get_cached_font(max(8, int(10 * ui_scale)))
+
+        cx: float = float(curr_frame["x"])
+        cy: float = float(curr_frame["y"])
+        heading: float = float(curr_frame["heading"])
+        gen_idx: int = int(gen_data.get("generation", 0))
+
+        if self.is_player_centered:
+            grid_multiplier: float = (
+                float(max(self.rows, self.cols)) if self.is_zoomed else 1.0
+            )
+            tile_size: float = (
+                config.TILE_SIZE * config.PLAYER_CAMERA_ZOOM * grid_multiplier
+            )
+            center_px: float = float(rx) + (float(rw) / 2.0)
+            center_py: float = float(ry) + (float(rh) / 2.0)
+
+            def get_tile_rect(tx: int, ty: int) -> Tuple[int, int, int, int]:
+                t_x: int = int(round(center_px + (float(tx) - cx) * tile_size))
+                t_y: int = int(round(center_py + (float(ty) - cy) * tile_size))
+                return (t_x, t_y, int(tile_size) + 1, int(tile_size) + 1)
+
+            origin_pixel: Tuple[int, int] = (
+                int(round(center_px)),
+                int(round(center_py))
+            )
+
+            for y in range(map_data.height):
+                for x in range(map_data.width):
+                    t_rect = get_tile_rect(x, y)
+                    if (
+                        t_rect[0] + t_rect[2] < rx or
+                        t_rect[0] > rx + rw or
+                        t_rect[1] + t_rect[3] < ry or
+                        t_rect[1] > ry + rh
+                    ):
+                        continue
+
+                    if (x, y) == map_data.start_pos:
+                        pygame.draw.rect(surface, config.COLOR_START, t_rect)
+                    elif (x, y) == map_data.exit_pos:
+                        pygame.draw.rect(surface, config.COLOR_EXIT, t_rect)
+                    elif map_data.is_wall(x, y):
+                        pygame.draw.rect(surface, config.COLOR_WALL, t_rect)
+                        pygame.draw.rect(
+                            surface, config.COLOR_WALL_BORDER, t_rect, 1
+                        )
+                    else:
+                        pygame.draw.rect(surface, config.COLOR_FLOOR, t_rect)
+                        pygame.draw.rect(
+                            surface, config.COLOR_FLOOR_BORDER, t_rect, 1
+                        )
+        else:
+            tile_size = min(
+                float(rw) / float(map_data.width),
+                float(rh) / float(map_data.height)
+            )
+
+            origin_pixel = (
+                int(rx + (cx * tile_size)),
+                int(ry + (cy * tile_size))
+            )
+
+            bg_surf = self._get_rendered_map_surface(
+                map_data, gen_idx, rw, rh
+            )
+            surface.blit(bg_surf, (rx, ry))
+
+        # Sample vision arc fan points
+        cone_points: List[Tuple[int, int]] = [origin_pixel]
+        for rel_angle in self.sampler.relative_angles:
+            ray_angle: float = heading + rel_angle
+            wall_prox, _ = self.sampler._cast_single_ray(
+                cx, cy, ray_angle, map_data
+            )
+            dist_tiles: float = (1.0 - wall_prox) * config.VISION_MAX_DIST
+            ex: float = cx + (math.cos(ray_angle) * dist_tiles)
+            ey: float = cy + (math.sin(ray_angle) * dist_tiles)
+
+            if self.is_player_centered:
+                px_e: int = int(
+                    round(center_px + (ex - cx) * tile_size)
+                )
+                py_e: int = int(
+                    round(center_py + (ey - cy) * tile_size)
+                )
+            else:
+                px_e = int(rx + (ex * tile_size))
+                py_e = int(ry + (ey * tile_size))
+
+            cone_points.append((px_e, py_e))
+
+        # Render vision fan and translucent heading line onto alpha scratchpad
+        self._arc_scratchpad.fill((0, 0, 0, 0))
+
+        if len(cone_points) > 2:
+            rel_points = [
+                (pt[0] - rx, pt[1] - ry) for pt in cone_points
+            ]
+            pygame.draw.polygon(
+                self._arc_scratchpad, config.COLOR_VISION_ARC, rel_points
+            )
+
+        head_line_len: float = (
+            config.PLAYER_HEADING_LINE_LENGTH * tile_size
+        )
+        rel_origin: Tuple[int, int] = (
+            origin_pixel[0] - rx, origin_pixel[1] - ry
+        )
+        hx: int = int(rel_origin[0] + (math.cos(heading) * head_line_len))
+        hy: int = int(rel_origin[1] + (math.sin(heading) * head_line_len))
+        pygame.draw.line(
+            self._arc_scratchpad,
+            config.COLOR_PLAYER_HEADING_LINE,
+            rel_origin,
+            (hx, hy),
+            config.PLAYER_HEADING_LINE_WIDTH
+        )
+
+        surface.blit(
+            self._arc_scratchpad, (rx, ry), area=pygame.Rect(0, 0, rw, rh)
+        )
+
+        # Draw candidate body circle scaled by config.PLAYER_RADIUS_RATIO
+        px, py = origin_pixel
+        p_radius: int = max(
+            3, int(tile_size * 0.5 * config.PLAYER_RADIUS_RATIO)
+        )
+
+        body_color = (
+            config.COLOR_PLAYER_HIGHLIGHT if is_selected
+            else config.COLOR_PLAYER
+        )
+        pygame.draw.circle(surface, body_color, (px, py), p_radius)
+
+        face_str: str = curr_frame["face"]
+        raw_face = font_norm.render(
+            face_str, True, config.COLOR_PLAYER_TEXT
+        )
+        target_side: int = max(
+            2, int(p_radius * 2 * config.PLAYER_FACE_TEXT_SCALE)
+        )
+        scaled_face = pygame.transform.smoothscale(
+            raw_face, (target_side, target_side)
+        )
+        f_rect = scaled_face.get_rect(center=(px, py))
+        surface.blit(scaled_face, f_rect)
+
+        # Draw candidate index label (#0, #1, ...) in top-left
+        idx_surf = font_norm.render(
+            f"#{cand_idx}", True, config.COLOR_PLAYER_HIGHLIGHT
+        )
+        surface.blit(idx_surf, (rx + 4, ry + 4))
+
+        # Draw Right-Anchored Health Bar & Percentage Label in top-right
+        health_val: float = float(curr_frame.get("health", 1.0))
+        pct_val: float = health_val * 100.0
+
+        if health_val >= 0.50:
+            hp_color = config.COLOR_HEALTH_FULL
+        elif health_val >= 0.20:
+            hp_color = config.COLOR_HEALTH_MID
+        else:
+            hp_color = config.COLOR_HEALTH_LOW
+
+        bar_w: int = int(rw * 0.20 * ui_scale)
+        bar_h: int = max(4, int(6 * ui_scale))
+        bar_x: int = rx + rw - bar_w - int(6 * ui_scale)
+        bar_y: int = ry + int(6 * ui_scale)
+
+        fill_w: int = int(bar_w * health_val)
+        bar_fill_x: int = bar_x + (bar_w - fill_w)
+
+        pct_surf = font_small.render(
+            f"{pct_val:5.1f}%", True, hp_color
+        )
+        pct_rect = pct_surf.get_rect(
+            midright=(bar_x - 4, bar_y + (bar_h // 2))
+        )
+        surface.blit(pct_surf, pct_rect)
+
+        pygame.draw.rect(
+            surface, config.COLOR_WALL_BORDER, (bar_x, bar_y, bar_w, bar_h)
+        )
+        if fill_w > 0:
+            pygame.draw.rect(
+                surface, hp_color, (bar_fill_x, bar_y, fill_w, bar_h)
+            )
+
+        surface.set_clip(None)
+
+        reached_exit: bool = bool(curr_frame.get("reached_exit", False))
+        is_alive: bool = bool(curr_frame.get("is_alive", True))
+
+        if reached_exit:
+            inset_rect: Tuple[int, int, int, int] = (
+                rx + 2, ry + 2, rw - 4, rh - 4
+            )
+            pygame.draw.rect(
+                surface, config.COLOR_FRAME_SOLVED, inset_rect, 2
+            )
+        elif not is_alive:
+            inset_rect = (rx + 2, ry + 2, rw - 4, rh - 4)
+            pygame.draw.rect(
+                surface, config.COLOR_FRAME_DEAD, inset_rect, 2
+            )
+
+        border_color = (
+            config.COLOR_PLAYER_HIGHLIGHT if is_selected
+            else config.COLOR_WALL_BORDER
+        )
+        border_width: int = 3 if is_selected else 1
+        pygame.draw.rect(surface, border_color, rect, border_width)
+
