@@ -8,6 +8,7 @@ parameters at human speed.
 
 import random
 import time
+import math
 from typing import Dict, Any, List, Optional, Tuple
 
 import numpy as np
@@ -43,7 +44,8 @@ class Episode:
         spawn_heading: float,
         run_number: int,
         profile_config: Dict[str, Any],
-        max_steps: int = config.MAX_SIMULATION_STEPS
+        max_steps: int = config.MAX_SIMULATION_STEPS,
+        generation: int = 0
     ) -> None:
         """
         Initializes a fresh live run episode with profile parameters.
@@ -54,6 +56,7 @@ class Episode:
         self.initial_bfs: int = initial_bfs
         self.spawn_heading: float = spawn_heading
         self.run_number: int = run_number
+        self.generation: int = generation
         self.profile_config: Dict[str, Any] = profile_config
         self.max_steps: int = max_steps
 
@@ -68,6 +71,7 @@ class Episode:
         self.finished: bool = False
         self.solved: bool = False
         self.finish_step: int = 0
+        self._celebration_count: int = 0
 
         self._kinematics: CandidateKinematics = CandidateKinematics(
             profile_config=profile_config
@@ -92,14 +96,54 @@ class Episode:
             kinematics_cfg.get("move_speed", 0.1)
         )
 
+        self.spin_enabled: bool = bool(
+            metabolics.get("spin_penalty_enabled", True)
+        )
+        self.spin_thresh_rad: float = math.radians(
+            float(metabolics.get("spin_angle_threshold_deg", 360.0))
+        )
+        self.spin_reset_rad: float = math.radians(
+            float(metabolics.get("spin_reset_angle_deg", 5.0))
+        )
+        self.spin_hold_frames: int = int(
+            metabolics.get("spin_reset_hold_frames", 15)
+        )
+        self.spin_dmg: float = float(
+            metabolics.get("spin_damage_per_frame", 0.003)
+        )
+
+        self.stag_enabled: bool = bool(
+            metabolics.get("stagnation_enabled", True)
+        )
+        self.stag_limit: int = int(
+            self.max_steps * float(
+                metabolics.get("stagnation_timeout_ratio", 0.75)
+            )
+        )
+        self.stag_dmg: float = float(
+            metabolics.get("stagnation_damage_per_frame", 0.001)
+        )
+
+        self.cum_rotation: float = 0.0
+        self.straight_ticks: int = 0
+        self.stagnation_ticks: int = 0
+
+        self.last_hit: bool = False
+        self.is_idle: bool = False
+        self.is_spinning: bool = False
+
+        # Pre-simulate run to completion immediately (<1ms)
+        self.simulate_up_to(self.max_steps)
+
     def run_data(self) -> Dict[str, Any]:
         """
-        Exposes episode telemetry dictionary.
+        Exposes episode telemetry dictionary including generation index.
         """
         return {
             "map_data": self.map_data,
             "frames": self.frames,
             "run_number": self.run_number,
+            "generation": self.generation,
             "initial_bfs": self.initial_bfs,
             "max_steps": self.max_steps,
             "finished": self.finished,
@@ -117,6 +161,40 @@ class Episode:
         """
         Runs one simulation tick for the agent and records its frame.
         """
+        if self.solved:
+            # Handle post-solve celebration frames
+            step: int = len(self.frames) + 1
+            self._celebration_count += 1
+
+            celebration_cap: int = getattr(
+                config, "WINNER_CELEBRATION_FRAMES", 60
+            )
+
+            last_frame: Dict[str, Any] = (
+                self.frames[-1] if self.frames else {}
+            )
+            self.frames.append({
+                "step": step,
+                "x": self.state.x,
+                "y": self.state.y,
+                "heading": self.state.heading,
+                "face": config.FACE_EXIT,
+                "hit_wall": False,
+                "health": 1.0,
+                "is_alive": True,
+                "reached_exit": True,
+                "dist": 0,
+                "activations": last_frame.get("activations", [])
+            })
+
+            if (
+                self._celebration_count >= celebration_cap
+                or step >= self.max_steps
+            ):
+                self.finished = True
+                self.finish_step = step
+            return
+
         state: PlayerState = self.state
         step: int = len(self.frames) + 1
 
@@ -139,6 +217,9 @@ class Episode:
             state.health,
             self.map_data,
             current_dist=current_dist,
+            last_hit=self.last_hit,
+            is_idle=self.is_idle,
+            is_spinning=self.is_spinning,
             profile_config=self.profile_config
         )
 
@@ -152,6 +233,7 @@ class Episode:
         move_eff: float = float(outputs[0, 0])
         turn_eff: float = float(outputs[0, 1])
 
+        old_heading: float = state.heading
         state.heading, is_stationary_turn = (
             self._kinematics.apply_rotation(
                 state.heading,
@@ -159,6 +241,21 @@ class Episode:
                 move_eff
             )
         )
+
+        heading_delta: float = abs(state.heading - old_heading)
+        if heading_delta > math.pi:
+            heading_delta = (2.0 * math.pi) - heading_delta
+
+        if heading_delta >= self.spin_reset_rad:
+            self.straight_ticks = 0
+            self.cum_rotation += heading_delta
+        else:
+            self.straight_ticks += 1
+
+        if self.straight_ticks >= self.spin_hold_frames:
+            self.cum_rotation = 0.0
+
+        self.stagnation_ticks += 1
 
         nx, ny, hit = self._kinematics.calculate_forward_step(
             state.x,
@@ -194,6 +291,20 @@ class Episode:
                 state.health - self.idle_damage
             )
 
+        is_spinning: bool = False
+        if self.spin_enabled and self.cum_rotation >= self.spin_thresh_rad:
+            is_spinning = True
+            state.health = max(
+                0.0,
+                state.health - self.spin_dmg
+            )
+
+        if self.stag_enabled and self.stagnation_ticks >= self.stag_limit:
+            state.health = max(
+                0.0,
+                state.health - self.stag_dmg
+            )
+
         if state.health <= 0.0:
             state.is_alive = False
 
@@ -216,9 +327,16 @@ class Episode:
             )
             state.health = min(1.0, state.health + heal_amount)
             state.best_step_dist = curr_dist
+            self.stagnation_ticks = 0
+            self.cum_rotation = 0.0
+            self.straight_ticks = 0
 
         if tx == self.map_data.exit_pos[0] and ty == self.map_data.exit_pos[1]:
             state.has_reached_exit = True
+
+        self.last_hit = hit
+        self.is_idle = is_idle
+        self.is_spinning = is_spinning
 
         face: str = PlayerExpress.resolve_face(
             state.has_reached_exit,
@@ -248,7 +366,6 @@ class Episode:
         })
 
         if state.has_reached_exit:
-            self.finished = True
             self.solved = True
             self.finish_step = step
         elif not state.is_alive:
@@ -278,7 +395,7 @@ class DisplayRunner:
 
         self.registry: BrainLibraryRegistry = BrainLibraryRegistry()
         self.profile_id: str = str(
-            getattr(config, "ACTIVE_PROFILE_ID", "scooterking38")
+            getattr(config, "ACTIVE_PROFILE_ID", "herbal1st")
         )
         self.profile_config: Dict[str, Any] = self.registry.get_profile(
             self.profile_id
@@ -296,18 +413,22 @@ class DisplayRunner:
 
         self.episode: Optional[Episode] = None
         self.active_frame: int = 0
+        self.active_gen: int = 0
         self.run_number: int = 0
         self.genome: Optional[Tuple[List[np.ndarray], List[np.ndarray]]] = None
         self._last_metrics_time: float = 0.0
         self._last_click_time: int = 0
 
+        num_runs: int = (
+            config.POPULATION_SIZE * config.MAPS_PER_CANDIDATE
+        )
         self.metrics: Dict[str, Any] = {
             "generation": 0,
             "num_generations": config.LEARNING_GENERATIONS,
             "best_fitness": 0.0,
             "gen_fitness": 0.0,
             "solve_count": 0,
-            "num_runs": config.SIMULATION_RUNS,
+            "num_runs": num_runs,
         }
         self.gen_history: List[Dict[str, Any]] = []
 
@@ -379,21 +500,15 @@ class DisplayRunner:
         """
         Builds a fresh randomly-seeded maze for the next display run.
         """
-        if (
-            config.MAP_DIFFICULTY_MIN
-            >= config.MAP_DIFFICULTY_MAX
-        ):
+        if config.MAP_DIFFICULTY_MIN >= config.MAP_DIFFICULTY_MAX:
             difficulty: float = config.MAP_DIFFICULTY_MIN
         else:
             difficulty = random.uniform(
-                config.MAP_DIFFICULTY_MIN,
-                config.MAP_DIFFICULTY_MAX
+                config.MAP_DIFFICULTY_MIN, config.MAP_DIFFICULTY_MAX
             )
 
-        map_data: MapData = (
-            self.map_generator.generate_solvable_map(
-                difficulty_ratio=difficulty
-            )
+        map_data: MapData = self.map_generator.generate_solvable_map(
+            difficulty_ratio=difficulty
         )
 
         pathfinder: BFSPathfinder = BFSPathfinder(map_data)
@@ -402,17 +517,11 @@ class DisplayRunner:
         initial_bfs: int = pathfinder.get_step_distance(
             *map_data.start_pos
         )
-
         dist_grid: np.ndarray = np.asarray(
-            pathfinder.distance_matrix,
-            dtype=np.int64
+            pathfinder.distance_matrix, dtype=np.int64
         )
-
-        spawn_heading: float = (
-            self._transformer.generate_random_heading(
-                map_data,
-                map_data.start_pos
-            )
+        spawn_heading: float = self._transformer.generate_random_heading(
+            map_data, map_data.start_pos
         )
 
         return map_data, dist_grid, initial_bfs, spawn_heading
@@ -440,7 +549,8 @@ class DisplayRunner:
             initial_bfs,
             spawn_heading,
             self.run_number,
-            profile_config=self.profile_config
+            profile_config=self.profile_config,
+            generation=self.active_gen
         )
         self.active_frame = 0
 
@@ -485,20 +595,49 @@ class DisplayRunner:
         running: bool = True
 
         while running:
-            if (
-                self._stop_event is not None
-                and self._stop_event.is_set()
-            ):
+            if self._stop_event is not None and self._stop_event.is_set():
                 running = False
                 break
+
+            self._refresh_metrics()
+            latest_gen: int = int(self.metrics.get("generation", 0))
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
 
                 elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_RETURN:
+                    if event.key == pygame.K_ESCAPE:
+                        running = False
+                        if self._stop_event is not None:
+                            self._stop_event.set()
+
+                    elif event.key == pygame.K_RETURN:
                         self.viewport.toggle_camera_mode()
+
+                    elif event.key == pygame.K_SPACE:
+                        self.scrubber.is_playing = (
+                            not self.scrubber.is_playing
+                        )
+
+                    elif event.key == pygame.K_LEFT:
+                        self.active_frame = max(0, self.active_frame - 25)
+
+                    elif event.key == pygame.K_RIGHT:
+                        self.active_frame = min(
+                            config.MAX_SIMULATION_STEPS - 1,
+                            self.active_frame + 25
+                        )
+
+                    elif event.key == pygame.K_PAGEUP:
+                        if self.active_gen < latest_gen:
+                            self.active_gen += 1
+                            self.episode = None
+
+                    elif event.key == pygame.K_PAGEDOWN:
+                        if self.active_gen > 0:
+                            self.active_gen -= 1
+                            self.episode = None
 
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     now_ms: int = pygame.time.get_ticks()
@@ -514,19 +653,21 @@ class DisplayRunner:
                         is_double_click=is_double
                     )
 
-                    _new_gen, new_frame = (
-                        self.scrubber.handle_click(
-                            event.pos,
-                            self.metrics["num_generations"],
-                            config.MAX_SIMULATION_STEPS,
-                            mouse_button=event.button
-                        )
+                    new_gen, new_frame = self.scrubber.handle_click(
+                        event.pos,
+                        latest_gen,
+                        self.metrics["num_generations"],
+                        config.MAX_SIMULATION_STEPS,
+                        mouse_button=event.button
                     )
+
+                    if new_gen is not None:
+                        if new_gen != self.active_gen:
+                            self.active_gen = new_gen
+                            self.episode = None
 
                     if new_frame is not None:
                         self.active_frame = new_frame
-
-            self._refresh_metrics()
 
             if self.episode is None:
                 if self._state.get("initialized"):
@@ -563,6 +704,10 @@ class DisplayRunner:
                     and self.active_frame >= self.episode.finish_step
                 ):
                     if self.scrubber.repeat_all:
+                        if self.active_gen < latest_gen:
+                            self.active_gen += 1
+                        else:
+                            self.active_gen = 0
                         self.episode = None
                         continue
                     else:
@@ -590,7 +735,8 @@ class DisplayRunner:
                 screen,
                 run_data,
                 self.active_frame,
-                self.metrics
+                self.metrics,
+                self.active_gen
             )
             self.graph.draw_graph(
                 screen,
@@ -600,7 +746,8 @@ class DisplayRunner:
             )
             self.scrubber.draw_controls(
                 screen,
-                self.metrics["generation"],
+                self.active_gen,
+                latest_gen,
                 self.metrics["num_generations"],
                 self.active_frame,
                 config.MAX_SIMULATION_STEPS,

@@ -10,7 +10,7 @@ import config
 
 class OverlayPanel:
     """
-    Renders dashboard headers, active run stats, and trainer metrics in columns.
+    Renders dashboard headers, active run stats, and trainer metrics.
     """
 
     def __init__(
@@ -33,7 +33,8 @@ class OverlayPanel:
         surface: pygame.Surface,
         run_data: Dict[str, Any],
         active_step: int,
-        metrics: Dict[str, Any]
+        metrics: Dict[str, Any],
+        active_gen: int = 0
     ) -> None:
         """
         Renders title header and 2-column live telemetry metrics.
@@ -53,14 +54,13 @@ class OverlayPanel:
         )
         surface.blit(title_surf, (self.x + 12, self.y + 10))
 
-        run_number: int = int(run_data.get("run_number", 0))
-        max_f: int = int(run_data.get("max_steps", config.MAX_SIMULATION_STEPS))
-        gen: int = int(metrics.get("generation", 0)) + 1
-        total_gens: int = int(metrics.get("num_generations", 1))
+        cand_idx: int = int(run_data.get("cand_idx", 0))
+        max_f: int = int(
+            run_data.get("max_steps", config.MAX_SIMULATION_STEPS)
+        )
+        gen_num: int = active_gen + 1
         best_fitness: float = float(metrics.get("best_fitness", 0.0))
         gen_fitness: float = float(metrics.get("gen_fitness", 0.0))
-        solve_count: int = int(metrics.get("solve_count", 0))
-        num_runs: int = int(metrics.get("num_runs", 1))
 
         # Column X coordinates and Row Y coordinates
         col1_x: int = self.x + 12
@@ -71,7 +71,7 @@ class OverlayPanel:
 
         # Left Column Metrics
         lbl_sel = self.body_font.render(
-            f"RUN       : #{run_number}",
+            f"GEN      : #{gen_num}",
             True,
             config.COLOR_PLAYER_HIGHLIGHT
         )
@@ -85,7 +85,7 @@ class OverlayPanel:
         surface.blit(lbl_step, (col1_x, row_y2))
 
         lbl_gen = self.body_font.render(
-            f"GENERATION: {gen}/{total_gens}",
+            f"AGENT    : #{cand_idx}",
             True,
             (255, 255, 255)
         )
@@ -93,7 +93,7 @@ class OverlayPanel:
 
         # Right Column Metrics
         lbl_win = self.body_font.render(
-            f"WINNER   : #{gen if best_fitness > 0 else 0}",
+            f"WINNER   : #{gen_num if best_fitness > 0 else 0}",
             True,
             config.COLOR_EXIT
         )

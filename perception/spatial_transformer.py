@@ -1,10 +1,11 @@
 """
-Spatial feature compiler and candidate spawn heading randomizer.
+Spatial feature compiler with Line-of-Sight gating, memory, and penalties.
 """
 
+from collections import deque
 import math
 import random
-from typing import Tuple, Optional, Dict, Any
+from typing import Tuple, Optional, Dict, Any, Deque
 import numpy as np
 from numpy.typing import NDArray
 
@@ -63,16 +64,35 @@ class SpatialTransformer:
         health_ratio: float,
         map_data: MapData,
         current_dist: Optional[float] = None,
-        profile_config: Optional[Dict[str, Any]] = None
+        last_hit: bool = False,
+        is_idle: bool = False,
+        is_spinning: bool = False,
+        profile_config: Optional[Dict[str, Any]] = None,
+        history_buffer: Optional[Deque[NDArray[np.float32]]] = None
     ) -> NDArray[np.float32]:
         """
-        Samples wall rays and target compass into flat feature channels.
+        Samples wall rays, goal sensors, and dedicated penalty channels.
         """
         sensory: Dict[str, Any] = (
             profile_config.get("sensory", {}) if profile_config else {}
         )
+        topology: Dict[str, Any] = (
+            profile_config.get("topology", {}) if profile_config else {}
+        )
+        kinematics: Dict[str, Any] = (
+            profile_config.get("kinematics", {}) if profile_config else {}
+        )
+
         include_compass: bool = bool(sensory.get("include_compass", False))
         include_bfs: bool = bool(sensory.get("include_bfs_sensor", False))
+        enable_los: bool = bool(sensory.get("enable_los_gating", False))
+        max_range: float = float(sensory.get("goal_sensor_max_range", 0.0))
+        memory_frames: int = max(1, int(topology.get("memory_frames", 1)))
+        max_speed: float = float(kinematics.get("move_speed", 0.1))
+
+        norm_speed: float = min(
+            1.0, max(0.0, current_speed / max(1e-6, max_speed))
+        )
 
         wall_channels: NDArray[np.float32] = (
             self.sampler.sample_vision_channels(
@@ -80,37 +100,79 @@ class SpatialTransformer:
             )
         )
 
+        ex: float = float(map_data.exit_pos[0]) + 0.5
+        ey: float = float(map_data.exit_pos[1]) + 0.5
+        dx: float = ex - candidate_x
+        dy: float = ey - candidate_y
+        dist_to_exit: float = math.sqrt((dx * dx) + (dy * dy))
+
+        los_ok: bool = True
+        if enable_los:
+            los_ok = self.sampler.check_line_of_sight(
+                candidate_x, candidate_y, ex, ey, map_data
+            )
+
+        range_factor: float = 1.0
+        if max_range > 0.0:
+            if dist_to_exit > max_range:
+                range_factor = 0.0
+            else:
+                range_factor = 1.0 - (dist_to_exit / max_range)
+
+        if not los_ok:
+            range_factor = 0.0
+
         tg_left, tg_right = self._compute_stereo_compass(
             candidate_x, candidate_y, heading_rad, map_data.exit_pos
         )
+        tg_left *= range_factor
+        tg_right *= range_factor
 
         if include_compass:
             state_features: NDArray[np.float32] = np.array(
-                [tg_left, tg_right, current_speed, health_ratio],
+                [tg_left, tg_right, norm_speed, health_ratio],
                 dtype=np.float32
             )
         else:
             state_features = np.array(
-                [current_speed, health_ratio], dtype=np.float32
+                [norm_speed, health_ratio], dtype=np.float32
             )
 
         if include_bfs:
             max_span: float = float(map_data.height + map_data.width)
-            if current_dist is None:
-                dist_channel: NDArray[np.float32] = np.zeros(
-                    (1,), dtype=np.float32
-                )
+            if current_dist is None or not los_ok or range_factor <= 0.0:
+                dist_val: float = 0.0
             else:
-                dist_channel = np.array(
-                    [max(0.0, min(1.0, float(current_dist) / max_span))],
-                    dtype=np.float32
+                grad: float = max(
+                    0.0, 1.0 - (float(current_dist) / max_span)
                 )
+                dist_val = grad * range_factor
 
-            state_features = np.concatenate(
-                [state_features, dist_channel]
+            dist_channel: NDArray[np.float32] = np.array(
+                [dist_val], dtype=np.float32
             )
+            state_features = np.concatenate([state_features, dist_channel])
 
-        return np.concatenate([wall_channels, state_features])
+        hit_val: float = 1.0 if last_hit else 0.0
+        idle_val: float = 1.0 if is_idle else 0.0
+        spin_val: float = 1.0 if is_spinning else 0.0
+
+        penalty_features: NDArray[np.float32] = np.array(
+            [hit_val, idle_val, spin_val], dtype=np.float32
+        )
+        state_features = np.concatenate([state_features, penalty_features])
+
+        single_frame: NDArray[np.float32] = np.concatenate(
+            [wall_channels, state_features]
+        )
+
+        if history_buffer is not None and memory_frames > 1:
+            history_buffer.append(single_frame)
+            while len(history_buffer) < memory_frames:
+                history_buffer.appendleft(single_frame)
+            return np.concatenate(list(history_buffer))
+
+        return single_frame
 
     def compile_feature_batch(
         self,
@@ -119,11 +181,14 @@ class SpatialTransformer:
         headings: NDArray[np.float64],
         speeds: NDArray[np.float64],
         healths: NDArray[np.float64],
-        map_data: MapData = None,
-        wall_grid: Optional[np.ndarray] = None,
-        wall_grids: Optional[np.ndarray] = None,
-        exit_positions: Optional[np.ndarray] = None,
-        current_dists: Optional[np.ndarray] = None,
+        map_data: Optional[MapData] = None,
+        wall_grid: Optional[NDArray[np.bool_]] = None,
+        wall_grids: Optional[NDArray[np.bool_]] = None,
+        exit_positions: Optional[NDArray[np.int64]] = None,
+        current_dists: Optional[NDArray[np.float64]] = None,
+        last_hits: Optional[NDArray[np.bool_]] = None,
+        is_idles: Optional[NDArray[np.bool_]] = None,
+        is_spinnings: Optional[NDArray[np.bool_]] = None,
         profile_config: Optional[Dict[str, Any]] = None
     ) -> NDArray[np.float32]:
         """
@@ -132,13 +197,21 @@ class SpatialTransformer:
         sensory: Dict[str, Any] = (
             profile_config.get("sensory", {}) if profile_config else {}
         )
+        kinematics: Dict[str, Any] = (
+            profile_config.get("kinematics", {}) if profile_config else {}
+        )
         include_compass: bool = bool(sensory.get("include_compass", False))
         include_bfs: bool = bool(sensory.get("include_bfs_sensor", False))
+        max_speed: float = float(kinematics.get("move_speed", 0.1))
+
+        norm_speeds: NDArray[np.float64] = np.clip(
+            speeds / max(1e-6, max_speed), 0.0, 1.0
+        )
 
         if wall_grids is not None:
             wall_channels: NDArray[np.float32] = (
                 self.sampler.sample_vision_channels_batch(
-                    xs, ys, headings, map_data, wall_grids=wall_grids
+                    xs, ys, headings, wall_grids=wall_grids
                 )
             )
         else:
@@ -150,18 +223,22 @@ class SpatialTransformer:
             tg_left, tg_right = self._compute_stereo_compass_batch(
                 xs, ys, headings, exit_positions
             )
-        else:
+        elif map_data is not None:
             tg_left, tg_right = self._compute_stereo_compass_batch(
                 xs, ys, headings, map_data.exit_pos
             )
+        else:
+            n_cands: int = len(xs)
+            tg_left = np.zeros(n_cands, dtype=np.float64)
+            tg_right = np.zeros(n_cands, dtype=np.float64)
 
         if include_compass:
             state_features: NDArray[np.float32] = np.stack(
-                [tg_left, tg_right, speeds, healths], axis=1
+                [tg_left, tg_right, norm_speeds, healths], axis=1
             ).astype(np.float32)
         else:
             state_features = np.stack(
-                [speeds, healths], axis=1
+                [norm_speeds, healths], axis=1
             ).astype(np.float32)
 
         if include_bfs:
@@ -170,9 +247,11 @@ class SpatialTransformer:
                     wall_grids.shape[1] + wall_grids.shape[2]
                 )
                 dist_channel: NDArray[np.float32] = np.clip(
-                    np.asarray(
-                        current_dists, dtype=np.float64
-                    ) / max_span,
+                    1.0 - (
+                        np.asarray(
+                            current_dists, dtype=np.float64
+                        ) / max_span
+                    ),
                     0.0,
                     1.0
                 ).astype(np.float32).reshape(-1, 1)
@@ -185,17 +264,71 @@ class SpatialTransformer:
                 [state_features, dist_channel], axis=1
             )
 
+        n_cands = len(xs)
+        hit_arr: NDArray[np.float32] = (
+            last_hits.astype(np.float32) if last_hits is not None
+            else np.zeros(n_cands, dtype=np.float32)
+        )
+        idle_arr: NDArray[np.float32] = (
+            is_idles.astype(np.float32) if is_idles is not None
+            else np.zeros(n_cands, dtype=np.float32)
+        )
+        spin_arr: NDArray[np.float32] = (
+            is_spinnings.astype(np.float32) if is_spinnings is not None
+            else np.zeros(n_cands, dtype=np.float32)
+        )
+
+        penalty_batch: NDArray[np.float32] = np.stack(
+            [hit_arr, idle_arr, spin_arr], axis=1
+        ).astype(np.float32)
+
+        state_features = np.concatenate(
+            [state_features, penalty_batch], axis=1
+        )
+
         return np.concatenate([wall_channels, state_features], axis=1)
+
+    def _compute_stereo_compass(
+        self,
+        cx: float,
+        cy: float,
+        heading: float,
+        exit_pos: Tuple[int, int]
+    ) -> Tuple[float, float]:
+        """
+        Computes TG-L and TG-R stereo target compass channels.
+        """
+        ex: float = float(exit_pos[0]) + 0.5
+        ey: float = float(exit_pos[1]) + 0.5
+
+        dx: float = ex - cx
+        dy: float = ey - cy
+
+        target_angle: float = math.atan2(dy, dx)
+        angle_delta: float = (target_angle - heading) % (2.0 * math.pi)
+
+        if angle_delta > math.pi:
+            angle_delta -= 2.0 * math.pi
+
+        tg_left: float = 0.0
+        tg_right: float = 0.0
+
+        if -math.pi <= angle_delta <= 0.0:
+            tg_left = 1.0 - (abs(angle_delta) / math.pi)
+        if 0.0 <= angle_delta <= math.pi:
+            tg_right = 1.0 - (angle_delta / math.pi)
+
+        return max(0.0, min(1.0, tg_left)), max(0.0, min(1.0, tg_right))
 
     def _compute_stereo_compass_batch(
         self,
         cxs: NDArray[np.float64],
         cys: NDArray[np.float64],
         headings: NDArray[np.float64],
-        exit_pos: object
+        exit_pos: Any
     ) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
         """
-        Vectorized stereo binocular target compass for (N,) headings.
+        Vectorized stereo target compass for (N,) candidate headings.
         """
         if isinstance(exit_pos, tuple):
             ex: NDArray[np.float64] = np.full_like(
@@ -205,7 +338,7 @@ class SpatialTransformer:
                 cys, float(exit_pos[1]) + 0.5
             )
         else:
-            ep: np.ndarray = np.asarray(exit_pos, dtype=np.float64)
+            ep: NDArray[np.float64] = np.asarray(exit_pos, dtype=np.float64)
             ex = ep[:, 0] + 0.5
             ey = ep[:, 1] + 0.5
 
@@ -235,35 +368,3 @@ class SpatialTransformer:
             np.clip(tg_left, 0.0, 1.0),
             np.clip(tg_right, 0.0, 1.0),
         )
-
-    def _compute_stereo_compass(
-        self,
-        cx: float,
-        cy: float,
-        heading: float,
-        exit_pos: Tuple[int, int]
-    ) -> Tuple[float, float]:
-        """
-        Computes TG-L and TG-R stereo binocular target compass channels.
-        """
-        ex: float = float(exit_pos[0]) + 0.5
-        ey: float = float(exit_pos[1]) + 0.5
-
-        dx: float = ex - cx
-        dy: float = ey - cy
-
-        target_angle: float = math.atan2(dy, dx)
-        angle_delta: float = (target_angle - heading) % (2.0 * math.pi)
-
-        if angle_delta > math.pi:
-            angle_delta -= 2.0 * math.pi
-
-        tg_left: float = 0.0
-        tg_right: float = 0.0
-
-        if -math.pi <= angle_delta <= 0.0:
-            tg_left = 1.0 - (abs(angle_delta) / math.pi)
-        if 0.0 <= angle_delta <= math.pi:
-            tg_right = 1.0 - (angle_delta / math.pi)
-
-        return max(0.0, min(1.0, tg_left)), max(0.0, min(1.0, tg_right))

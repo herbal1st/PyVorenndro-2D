@@ -1,7 +1,40 @@
 # =============================================================================
 # BRAIN LIBRARY CONFIGURATION REGISTRY
 # =============================================================================
+
 library:
+
+  herbal1st:
+    file: "herbal1st_champion.npz"
+    topology:
+      hidden_layers: 3
+      neurons_per_layer: 20
+      memory_frames: 1
+    sensory:
+      vision_rays: 21
+      vision_arc_angle: 200.0
+      include_compass: false
+      include_bfs_sensor: false
+      enable_los_gating: false
+      goal_sensor_max_range: 0.0
+    kinematics:
+      profile_style: "TANK"
+      move_speed: 0.1
+      turn_speed_dpsec: 1800.0
+      player_radius_ratio: 0.5
+    metabolics:
+      collision_damage: 0.003
+      idle_damage: 0.001
+      recovery_ratio: 0.05
+      spin_penalty_enabled: true
+      spin_angle_threshold_deg: 360.0
+      spin_reset_angle_deg: 5.0
+      spin_reset_hold_frames: 15
+      spin_damage_per_frame: 0.003
+      stagnation_enabled: true
+      stagnation_timeout_ratio: 0.75
+      stagnation_damage_per_frame: 0.001
+
   scooterking38:
     file: "scooterking38_champion.npz"
     topology:
@@ -27,36 +60,7 @@ library:
       spin_penalty_enabled: true
       spin_angle_threshold_deg: 360.0
       spin_reset_angle_deg: 5.0
-      spin_damage_per_frame: 0.003
-      stagnation_enabled: true
-      stagnation_timeout_ratio: 0.75
-      stagnation_damage_per_frame: 0.001
-
-  herbal1st:
-    file: "herbal1st_champion.npz"
-    topology:
-      hidden_layers: 2
-      neurons_per_layer: 15
-      memory_frames: 1
-    sensory:
-      vision_rays: 19
-      vision_arc_angle: 180.0
-      include_compass: true
-      include_bfs_sensor: false
-      enable_los_gating: false
-      goal_sensor_max_range: 0.0
-    kinematics:
-      profile_style: "TANK"
-      move_speed: 0.1
-      turn_speed_dpsec: 1800.0
-      player_radius_ratio: 0.5
-    metabolics:
-      collision_damage: 0.003
-      idle_damage: 0.001
-      recovery_ratio: 0.05
-      spin_penalty_enabled: true
-      spin_angle_threshold_deg: 360.0
-      spin_reset_angle_deg: 5.0
+      spin_reset_hold_frames: 15
       spin_damage_per_frame: 0.003
       stagnation_enabled: true
       stagnation_timeout_ratio: 0.75
@@ -97,8 +101,9 @@ library:
 # spin_penalty_enabled:       Enables cumulative rotation spin penalty.
 # spin_angle_threshold_deg:   Rotation threshold in degrees before spin drain.
 # spin_reset_angle_deg:       Angular delta per tick below which spin resets.
+# spin_reset_hold_frames:     Required consecutive straight frames to reset.
 # spin_damage_per_frame:      Health deducted per frame while over spin limit.
 # stagnation_enabled:         Enables progress timeout stagnation penalty.
-# stagnation_timeout_ratio:   Fraction of max steps allowed without BFS progress.
+# stagnation_timeout_ratio:   Fraction of max steps allowed without progress.
 # stagnation_damage_per_frame: Health deducted per frame while stagnated.
 # =============================================================================

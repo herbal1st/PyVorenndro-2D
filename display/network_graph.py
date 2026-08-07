@@ -144,31 +144,60 @@ class NetworkGraph:
         profile_config: Optional[Dict[str, Any]] = None
     ) -> str:
         """
-        Generates shorthand labels for Wall Rays, TG-L, TG-R, SPD, and HP.
+        Generates shorthand labels for Wall Rays, Compass, HP, and Penalties.
         """
         sensory: Dict[str, Any] = (
             profile_config.get("sensory", {}) if profile_config else {}
         )
+        topology: Dict[str, Any] = (
+            profile_config.get("topology", {}) if profile_config else {}
+        )
+
         num_rays: int = int(sensory.get("vision_rays", 9))
         half_arc: float = float(sensory.get("vision_arc_angle", 120.0)) / 2.0
         include_compass: bool = bool(sensory.get("include_compass", False))
+        include_bfs: bool = bool(sensory.get("include_bfs_sensor", False))
+        memory_frames: int = max(1, int(topology.get("memory_frames", 1)))
 
-        if node_idx < num_rays:
+        base_channels: int = (
+            num_rays
+            + (2 if include_compass else 0)
+            + 2  # SPD, HP
+            + (1 if include_bfs else 0)
+            + 3  # HIT, IDL, SPN
+        )
+
+        frame_offset: int = node_idx // base_channels
+        base_idx: int = node_idx % base_channels
+        frame_tag: str = f"-{frame_offset}" if frame_offset > 0 else ""
+
+        if base_idx < num_rays:
             step: float = (2.0 * half_arc) / float(max(1, num_rays - 1))
-            deg: int = int(round(-half_arc + (node_idx * step)))
-            return f"{deg:+d}°"
+            deg: int = int(round(-half_arc + (base_idx * step)))
+            return f"{deg:+d}°{frame_tag}"
 
         curr_idx: int = num_rays
         if include_compass:
-            if node_idx == curr_idx:
-                return "TG-L"
-            if node_idx == curr_idx + 1:
-                return "TG-R"
+            if base_idx == curr_idx:
+                return f"TG-L{frame_tag}"
+            if base_idx == curr_idx + 1:
+                return f"TG-R{frame_tag}"
             curr_idx += 2
 
-        if node_idx == curr_idx:
-            return "SPD"
-        if node_idx == curr_idx + 1:
-            return "HP"
+        if base_idx == curr_idx:
+            return f"SPD{frame_tag}"
+        if base_idx == curr_idx + 1:
+            return f"HP{frame_tag}"
+        curr_idx += 2
 
-        return "BFS"
+        if include_bfs:
+            if base_idx == curr_idx:
+                return f"BFS{frame_tag}"
+            curr_idx += 1
+
+        if base_idx == curr_idx:
+            return f"HIT{frame_tag}"
+        if base_idx == curr_idx + 1:
+            return f"IDL{frame_tag}"
+
+        return f"SPN{frame_tag}"

@@ -1,11 +1,8 @@
 """
 GPU-accelerated (PyTorch) single-agent trainer.
 
-The whole generation is simulated on the device: every run's maze is a row in
-stacked wall/distance grids and all runs advance step-by-step in lockstep as
-batched tensors. The GPU trainer subclasses HeadlessTrainer so it reuses the
-exact same profile registry, persistent storage handlers, elitist ES loop,
-adaptive mutation, and telemetry publishing.
+Simulates all candidates and mazes as batched CUDA tensors in GPU VRAM,
+synchronizing sensory, perception, penalty, and scaling parity with CPU.
 """
 
 import math
@@ -28,16 +25,14 @@ try:
     import torch.nn as nn
 
     _TORCH_OK: bool = True
-except Exception:  # pragma: no cover - torch not installed
+except Exception:
     torch = None  # type: ignore
     nn = None  # type: ignore
     _TORCH_OK = False
 
 
 def torch_available() -> bool:
-    """
-    Returns True only when PyTorch is importable and CUDA is usable.
-    """
+    """Returns True only when PyTorch is importable and CUDA is usable."""
     if not _TORCH_OK or torch is None:
         return False
     try:
@@ -56,9 +51,7 @@ def _sample_vision_fused(
     headings: torch.Tensor,
     wall_bool: torch.Tensor,
 ) -> torch.Tensor:
-    """
-    Breakless DDA variant of TorchSimulator.sample_vision.
-    """
+    """Breakless DDA variant of TorchSimulator.sample_vision."""
     n_cands: int = int(xs.shape[0])
     if n_cands == 0:
         return torch.zeros(
@@ -192,9 +185,7 @@ def _sample_vision_fused(
 
 
 def _compiled_sample_vision() -> Any:
-    """
-    Lazily compiles the fused breakless DDA once.
-    """
+    """Lazily compiles the fused breakless DDA once."""
     global _FUSED_VISION_COMPILED
 
     if _FUSED_VISION_COMPILED is None and _TORCH_OK:
@@ -207,9 +198,7 @@ def _compiled_sample_vision() -> Any:
 
 
 class TorchAgentModule(nn.Module):
-    """
-    MLP mirroring Agent but as torch parameters for GPU forward pass.
-    """
+    """MLP mirroring Agent as PyTorch parameters for GPU execution."""
 
     def __init__(self, sizes: List[int]) -> None:
         super().__init__()
@@ -232,9 +221,7 @@ class TorchAgentModule(nn.Module):
         return h
 
     def load_from_agent(self, agent: Agent) -> "TorchAgentModule":
-        """
-        Copies the numpy genome into the torch parameters in place.
-        """
+        """Copies numpy genome arrays into PyTorch layer parameters."""
         with torch.no_grad():
             for linear, w, b in zip(
                 self.linears, agent.weights, agent.biases
@@ -257,9 +244,7 @@ class TorchAgentModule(nn.Module):
 
 
 class TorchSimulator:
-    """
-    Vectorized step-by-step maze simulation on a single torch device.
-    """
+    """Vectorized step-by-step maze simulation on CUDA/PyTorch tensors."""
 
     def __init__(
         self,
@@ -319,6 +304,32 @@ class TorchSimulator:
             metabolics.get("recovery_ratio", 0.05)
         )
 
+        self.spin_enabled: bool = bool(
+            metabolics.get("spin_penalty_enabled", True)
+        )
+        self.spin_thresh_rad: float = math.radians(
+            float(metabolics.get("spin_angle_threshold_deg", 360.0))
+        )
+        self.spin_reset_rad: float = math.radians(
+            float(metabolics.get("spin_reset_angle_deg", 5.0))
+        )
+        self.spin_hold_frames: int = int(
+            metabolics.get("spin_reset_hold_frames", 15)
+        )
+        self.spin_dmg: float = float(
+            metabolics.get("spin_damage_per_frame", 0.003)
+        )
+
+        self.stag_enabled: bool = bool(
+            metabolics.get("stagnation_enabled", True)
+        )
+        self.stag_timeout_ratio: float = float(
+            metabolics.get("stagnation_timeout_ratio", 0.75)
+        )
+        self.stag_dmg: float = float(
+            metabolics.get("stagnation_damage_per_frame", 0.001)
+        )
+
     def sample_vision(
         self,
         xs: torch.Tensor,
@@ -326,9 +337,7 @@ class TorchSimulator:
         headings: torch.Tensor,
         wall_bool: torch.Tensor
     ) -> torch.Tensor:
-        """
-        Batched Amanatides-Woo DDA across all (N,) origins at once.
-        """
+        """Batched Amanatides-Woo DDA across all (N,) origins at once."""
         if getattr(self.device, "type", "cpu") == "cuda":
             fused = _compiled_sample_vision()
             if fused is not None:
@@ -345,9 +354,7 @@ class TorchSimulator:
         headings: torch.Tensor,
         wall_bool: torch.Tensor
     ) -> torch.Tensor:
-        """
-        Eager (non-compiled) DDA fallback.
-        """
+        """Eager (non-compiled) DDA fallback."""
         n_cands: int = int(xs.shape[0])
         if n_cands == 0:
             return torch.zeros(
@@ -491,9 +498,7 @@ class TorchSimulator:
         headings: torch.Tensor,
         exit_pos: torch.Tensor
     ) -> torch.Tensor:
-        """
-        Stereo binocular target compass.
-        """
+        """Stereo binocular target compass."""
         ex: torch.Tensor = exit_pos[:, 0] + 0.5
         ey: torch.Tensor = exit_pos[:, 1] + 0.5
 
@@ -540,9 +545,7 @@ class TorchSimulator:
         torch.Tensor,
         torch.Tensor,
     ]:
-        """
-        Vectorized tank rotation, forward step, and Circle-to-AABB resolution.
-        """
+        """Vectorized tank rotation, step, & Circle-to-AABB pushback."""
         n: int = int(xs.shape[0])
         h: int = int(wall_grids.shape[1])
         w: int = int(wall_grids.shape[2])
@@ -644,40 +647,6 @@ class TorchSimulator:
 
         return px, py, new_headings, hit, is_stationary_turn
 
-    def simulate(
-        self,
-        module: TorchAgentModule,
-        wall_grids: torch.Tensor,
-        dist_grid: torch.Tensor,
-        exit_pos: torch.Tensor,
-        start_x: torch.Tensor,
-        start_y: torch.Tensor,
-        spawn_headings: torch.Tensor,
-        initial_bfs_dists: torch.Tensor,
-        max_steps: int
-    ) -> List[PlayerState]:
-        """
-        Runs one candidate genome across all N runs and returns PlayerStates.
-        """
-        def forward(
-            features: torch.Tensor
-        ) -> Tuple[torch.Tensor, torch.Tensor]:
-            outputs: torch.Tensor = module(features)
-            return outputs[:, 0:1], outputs[:, 1:2]
-
-        rows = self._simulate_rows(
-            forward,
-            wall_grids,
-            dist_grid,
-            exit_pos,
-            start_x,
-            start_y,
-            spawn_headings,
-            initial_bfs_dists,
-            max_steps
-        )
-        return _build_states(rows, 0, int(wall_grids.shape[0]))
-
     def simulate_candidates(
         self,
         modules: List[TorchAgentModule],
@@ -690,9 +659,7 @@ class TorchSimulator:
         initial_bfs_dists: torch.Tensor,
         max_steps: int
     ) -> List[List[PlayerState]]:
-        """
-        Runs every candidate genome in ONE batched tensor job.
-        """
+        """Runs candidate genomes in ONE batched CUDA tensor matrix job."""
         c_count: int = len(modules)
         n: int = int(wall_grids.shape[0])
         r_total: int = c_count * n
@@ -757,14 +724,13 @@ class TorchSimulator:
         initial_bfs_dists: torch.Tensor,
         max_steps: int
     ) -> Tuple[List[Any], ...]:
-        """
-        Shared step-by-step simulation over (R,) rows.
-        """
+        """Shared step-by-step GPU simulation over (R,) rows."""
         n: int = int(wall_grids.shape[0])
         h: int = int(wall_grids.shape[1])
         w: int = int(wall_grids.shape[2])
         max_span: float = float(h + w)
         move_speed: float = self.move_speed
+        stag_limit: int = int(max_steps * self.stag_timeout_ratio)
 
         wall_bool: torch.Tensor = wall_grids.to(torch.bool)
 
@@ -775,6 +741,16 @@ class TorchSimulator:
             n, dtype=self.dtype, device=self.device
         )
         best_dists: torch.Tensor = initial_bfs_dists.to(self.dtype).clone()
+        cum_rotation: torch.Tensor = torch.zeros(
+            n, dtype=self.dtype, device=self.device
+        )
+        straight_ticks: torch.Tensor = torch.zeros(
+            n, dtype=torch.int64, device=self.device
+        )
+        stagnation_ticks: torch.Tensor = torch.zeros(
+            n, dtype=torch.int64, device=self.device
+        )
+
         frames: torch.Tensor = torch.zeros(
             n, dtype=torch.int64, device=self.device
         )
@@ -787,12 +763,24 @@ class TorchSimulator:
         last_hit: torch.Tensor = torch.zeros(
             n, dtype=torch.bool, device=self.device
         )
+        is_idle: torch.Tensor = torch.zeros(
+            n, dtype=torch.bool, device=self.device
+        )
+        is_spinning: torch.Tensor = torch.zeros(
+            n, dtype=torch.bool, device=self.device
+        )
 
         inf_i: torch.Tensor = torch.tensor(
             9999, dtype=torch.int64, device=self.device
         )
         one_f: torch.Tensor = torch.tensor(
             1.0, dtype=self.dtype, device=self.device
+        )
+        zero_f: torch.Tensor = torch.tensor(
+            0.0, dtype=self.dtype, device=self.device
+        )
+        zero_i: torch.Tensor = torch.tensor(
+            0, dtype=torch.int64, device=self.device
         )
 
         rows: torch.Tensor = torch.arange(n, device=self.device)
@@ -842,6 +830,14 @@ class TorchSimulator:
                 ).clamp(0.0, 1.0)[:, None]
                 features = torch.cat([features, dist_ch], dim=1)
 
+            # Add dedicated penalty channels (HIT, IDL, SPN)
+            hit_ch: torch.Tensor = last_hit.to(self.dtype)[:, None]
+            idle_ch: torch.Tensor = is_idle.to(self.dtype)[:, None]
+            spin_ch: torch.Tensor = is_spinning.to(self.dtype)[:, None]
+            features = torch.cat(
+                [features, hit_ch, idle_ch, spin_ch], dim=1
+            )
+
             move_eff, turn_eff = forward(features)
             move_eff = move_eff * eff.unsqueeze(1).to(self.dtype)
             turn_eff = turn_eff * eff.unsqueeze(1).to(self.dtype)
@@ -861,6 +857,36 @@ class TorchSimulator:
                 wall_bool,
             )
 
+            heading_delta: torch.Tensor = torch.abs(new_headings - headings)
+            heading_delta = torch.where(
+                heading_delta > math.pi,
+                self.two_pi - heading_delta,
+                heading_delta
+            )
+
+            is_turning: torch.Tensor = heading_delta >= self.spin_reset_rad
+            straight_ticks = torch.where(
+                is_turning,
+                zero_i,
+                straight_ticks + eff.long()
+            )
+            cum_rotation = torch.where(
+                is_turning,
+                cum_rotation + heading_delta,
+                cum_rotation
+            )
+
+            should_reset_spin: torch.Tensor = (
+                straight_ticks >= self.spin_hold_frames
+            )
+            cum_rotation = torch.where(
+                should_reset_spin,
+                zero_f,
+                cum_rotation
+            )
+
+            stagnation_ticks = stagnation_ticks + eff.long()
+
             hlt: torch.Tensor = healths - (
                 hit.to(self.dtype) * self.coll_damage
             )
@@ -869,16 +895,37 @@ class TorchSimulator:
                 (torch.abs(px - xs) < 1e-4)
                 & (torch.abs(py - ys) < 1e-4)
             )
-            idle: torch.Tensor = (
+            is_idle = (
                 (move_eff.squeeze(1) < 0.05)
                 | not_moved
                 | is_stationary
             )
             hlt = hlt - (
-                idle.to(self.dtype)
+                is_idle.to(self.dtype)
                 * eff.to(self.dtype)
                 * self.idle_damage
             )
+
+            if self.spin_enabled:
+                is_spinning = (
+                    cum_rotation >= self.spin_thresh_rad
+                )
+                hlt = hlt - (
+                    is_spinning.to(self.dtype)
+                    * eff.to(self.dtype)
+                    * self.spin_dmg
+                )
+
+            if self.stag_enabled:
+                is_stagnated: torch.Tensor = (
+                    stagnation_ticks >= stag_limit
+                )
+                hlt = hlt - (
+                    is_stagnated.to(self.dtype)
+                    * eff.to(self.dtype)
+                    * self.stag_dmg
+                )
+
             hlt = hlt.clamp(min=0.0)
 
             tx: torch.Tensor = torch.floor(px).to(torch.int64)
@@ -909,6 +956,16 @@ class TorchSimulator:
             )
             best_dists = torch.where(
                 better, curr_dist, best_dists
+            )
+
+            stagnation_ticks = torch.where(
+                better, zero_i, stagnation_ticks
+            )
+            cum_rotation = torch.where(
+                better, zero_f, cum_rotation
+            )
+            straight_ticks = torch.where(
+                better, zero_i, straight_ticks
             )
 
             ex: torch.Tensor = exit_pos[:, 0].to(torch.int64)
@@ -950,9 +1007,7 @@ class TorchSimulator:
 def _stack_modules(
     modules: List[TorchAgentModule]
 ) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
-    """
-    Stacks per-candidate layer weights into batched GPU tensors.
-    """
+    """Stacks per-candidate layer weights into batched GPU tensors."""
     layer_count: int = len(modules[0].linears)
 
     stack_w: List[torch.Tensor] = []
@@ -976,9 +1031,7 @@ def _build_states(
     offset: int,
     count: int
 ) -> List[PlayerState]:
-    """
-    Rebuilds PlayerState objects from the raw per-row CPU lists.
-    """
+    """Rebuilds PlayerState objects from raw per-row CPU lists."""
     (
         xs_cpu,
         ys_cpu,
@@ -1014,9 +1067,7 @@ def _build_states(
 
 
 class GpuHeadlessTrainer(HeadlessTrainer):
-    """
-    GPU single-agent trainer running batched tensor jobs.
-    """
+    """GPU single-agent trainer running batched CUDA tensor jobs."""
 
     def __init__(
         self,
@@ -1025,14 +1076,19 @@ class GpuHeadlessTrainer(HeadlessTrainer):
         state: Optional[Dict[str, Any]] = None,
         stop_event: Any = None
     ) -> None:
-        explicit_runs: bool = num_runs > 0
-        gpu_runs: int = int(getattr(config, "SIMULATION_RUNS_GPU", 0))
-        if num_runs <= 0:
-            num_runs = gpu_runs if gpu_runs > 0 else config.SIMULATION_RUNS
+        self.population_size = max(
+            2, int(getattr(config, "POPULATION_SIZE", 16))
+        )
+        self.shared_runs = max(
+            1, int(getattr(config, "MAPS_PER_CANDIDATE", 8))
+        )
 
-        gpu_pop: int = int(getattr(config, "POPULATION_SIZE_GPU", 0))
-        if gpu_pop > 0:
-            config.POPULATION_SIZE = gpu_pop
+        calculated_runs: int = self.population_size * self.shared_runs
+        if num_runs <= 0:
+            num_runs = calculated_runs
+            explicit_runs: bool = False
+        else:
+            explicit_runs = True
 
         super().__init__(
             num_runs=num_runs,
@@ -1061,9 +1117,7 @@ class GpuHeadlessTrainer(HeadlessTrainer):
         autotune.apply_auto_tuning(self)
 
     def _generate_run_maps(self, count: int) -> List[Tuple]:
-        """
-        Builds the generation's shared map set across available CPU cores.
-        """
+        """Builds shared map set across available CPU worker cores."""
         if count <= 0:
             return []
 
@@ -1104,9 +1158,7 @@ class GpuHeadlessTrainer(HeadlessTrainer):
         return runs
 
     def _submit_map_batch(self, count: int) -> List[Any]:
-        """
-        Submits count map-generation tasks with independent seeds.
-        """
+        """Submits count map-generation tasks with independent seeds."""
         seeds: List[int] = [
             random.getrandbits(64) for _ in range(count)
         ]
@@ -1120,9 +1172,7 @@ class GpuHeadlessTrainer(HeadlessTrainer):
         ]
 
     def _shutdown_process_pool(self) -> None:
-        """
-        Shuts down parallel map pool and prefetch futures.
-        """
+        """Shuts down parallel map pool and prefetch futures."""
         super()._shutdown_process_pool()
 
         if self._prefetch_futures is not None:
@@ -1139,9 +1189,7 @@ class GpuHeadlessTrainer(HeadlessTrainer):
         agents: List[Agent],
         runs: List[Tuple]
     ) -> List[Tuple[float, List[float], List[PlayerState]]]:
-        """
-        Runs every candidate across the same shared map set on the GPU.
-        """
+        """Runs every candidate across the shared map set on CUDA/PyTorch."""
         num_runs: int = len(runs)
         height: int = self._map_height
         width: int = self._map_width

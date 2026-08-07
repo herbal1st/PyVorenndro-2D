@@ -43,7 +43,7 @@ class Agent:
     def from_profile(
         cls,
         profile_config: Dict[str, Any],
-        input_size: int,
+        input_size: int = 0,
         output_size: int = 2,
         seed: Optional[int] = None
     ) -> "Agent":
@@ -51,8 +51,25 @@ class Agent:
         Constructs an Agent directly from a resolved YAML profile dictionary.
         """
         topology: Dict[str, Any] = profile_config["topology"]
+        sensory: Dict[str, Any] = profile_config["sensory"]
+
         hidden_layers: int = int(topology.get("hidden_layers", 2))
         neurons: int = int(topology.get("neurons_per_layer", 32))
+        memory_frames: int = max(1, int(topology.get("memory_frames", 1)))
+
+        if input_size <= 0:
+            num_rays: int = int(sensory.get("vision_rays", 9))
+            include_compass: bool = bool(sensory.get("include_compass", False))
+            include_bfs: bool = bool(sensory.get("include_bfs_sensor", False))
+
+            base_channels: int = (
+                num_rays
+                + (2 if include_compass else 0)
+                + 2  # SPD, HP
+                + (1 if include_bfs else 0)
+                + 3  # HIT, IDL, SPN
+            )
+            input_size = base_channels * memory_frames
 
         layer_sizes: List[int] = [input_size] + [
             neurons for _ in range(hidden_layers)

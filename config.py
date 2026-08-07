@@ -3,12 +3,15 @@
 from typing import Tuple
 
 # ------ Active Profile Selection ------
-ACTIVE_PROFILE_ID: str = "scooterking38"  # profile
+ACTIVE_PROFILE_ID: str = "herbal1st"  # profile
 
 # ------ Display & Window Layout ------
 SCREEN_WIDTH: int = 1280  # pixels
 SCREEN_HEIGHT: int = 720  # pixels
 FPS: int = 60  # hertz
+VIEWPORT_GRID_ROWS: int = 4  # count
+VIEWPORT_GRID_COLS: int = 4  # count
+WINNER_CELEBRATION_FRAMES: int = 60  # frames
 
 # ------ World & Map Parameters ------
 MAP_TYPE: str = "BRANCHING WALLS"  # style
@@ -21,8 +24,9 @@ MIN_PATH_DIFFICULTY_RATIO: float = 0.85  # ratio
 
 # ------ Genetic Algorithm & Training ------
 LEARNING_GENERATIONS: int = 100  # generations
-SIMULATION_RUNS: int = 100  # simulations
-POPULATION_SIZE: int = 2  # candidates
+POPULATION_SIZE: int = 16  # candidates
+MAPS_PER_CANDIDATE: int = 8  # mazes
+SIMULATION_RUNS: int = POPULATION_SIZE * MAPS_PER_CANDIDATE  # simulations
 MAX_SIMULATION_STEPS: int = 1000  # ticks
 MAP_REGIME_GENERATIONS: int = 1  # generations
 REGIME_MIN_GENERATIONS: int = 8  # generations
@@ -31,9 +35,9 @@ REGIME_TRANSITION_MUTATION_BOOST: float = 1.0  # ratio
 MAP_DIFFICULTY_MIN: float = 0.55  # ratio
 MAP_DIFFICULTY_MAX: float = 0.85  # ratio
 MUTATION_RATE: float = 0.25  # ratio
-MUTATION_SCALE: float = 0.12  # scale
+MUTATION_SCALE: float = 0.08  # scale
 MUTATION_SCALE_MIN: float = 0.002  # scale
-MUTATION_SCALE_MAX: float = 0.5  # scale
+MUTATION_SCALE_MAX: float = 0.25  # scale
 MUTATION_ADAPT_WINDOW: int = 8  # generations
 STAGNATION_BUMP_GENERATIONS: int = 8  # generations
 STAGNATION_BUMP_FACTOR: float = 4.0  # multiplier
@@ -47,12 +51,8 @@ RECORDER_MAX_GENERATIONS: int = 1000  # generations
 SIMULATION_WORKERS: int = 0  # workers
 TRAINING_USE_LOW_PRIORITY: bool = True  # toggle
 
-# ------ GPU (PyTorch) Training Backend ------
+# ------ Hardware & Auto-Tuning ------
 TRAINING_BACKEND: str = "auto"  # backend
-SIMULATION_RUNS_GPU: int = 65536  # simulations
-POPULATION_SIZE_GPU: int = 32  # candidates
-
-# ------ Auto-Tuning Configuration ------
 AUTO_TUNE: bool = False  # toggle
 TARGET_GEN_TIME: float = 0.75  # seconds
 AUTO_TUNE_MIN_RUNS: int = 64  # simulations

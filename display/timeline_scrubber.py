@@ -22,7 +22,7 @@ class TimelineScrubber:
         """
         self.x, self.y, self.w, self.h = rect
         self.is_playing: bool = True
-        self.repeat_all: bool = True  # True = REP ALL, False = REP 1
+        self.repeat_all: bool = True  # True = REP ALL, False = REP GEN
         self.playback_speed: int = config.DEFAULT_PLAYBACK_SPEED
         self.speed_options: List[int] = [1, 2, 4, 8, 16]
 
@@ -55,6 +55,7 @@ class TimelineScrubber:
         self,
         surface: pygame.Surface,
         active_gen: int,
+        latest_gen: int,
         total_gens: int,
         active_frame: int,
         total_frames: int,
@@ -79,7 +80,7 @@ class TimelineScrubber:
             t_lbl, t_lbl.get_rect(center=self.btn_toggle_rect.center)
         )
 
-        # Repeat mode button (REP ALL / REP 1)
+        # Repeat mode button (REP ALL / REP GEN)
         r_color = (
             config.COLOR_BUTTON_ACTIVE if self.repeat_all
             else config.COLOR_BUTTON
@@ -88,7 +89,7 @@ class TimelineScrubber:
         pygame.draw.rect(
             surface, config.COLOR_WALL_BORDER, self.btn_repeat_rect, 1
         )
-        r_str: str = "REP ALL" if self.repeat_all else "REP 1"
+        r_str: str = "REP ALL" if self.repeat_all else "REP GEN"
         r_lbl = self.font.render(r_str, True, (255, 255, 255))
         surface.blit(
             r_lbl, r_lbl.get_rect(center=self.btn_repeat_rect.center)
@@ -106,7 +107,7 @@ class TimelineScrubber:
             sp_lbl, sp_lbl.get_rect(center=self.btn_speed_rect.center)
         )
 
-        # Timeline Bars
+        # Timeline Bars Background
         pygame.draw.rect(
             surface, config.COLOR_TIMELINE_BAR, self.frame_bar_rect
         )
@@ -114,18 +115,25 @@ class TimelineScrubber:
             surface, config.COLOR_TIMELINE_BAR, self.gen_bar_rect
         )
 
+        # Draw active completed progress fill on generation bar
+        tot_g: int = max(1, total_gens - 1)
+        progress_ratio: float = float(latest_gen) / float(tot_g)
+        progress_w: int = int(progress_ratio * self.gen_bar_rect.w)
+        if progress_w > 0:
+            prog_rect = pygame.Rect(
+                self.gen_bar_rect.x,
+                self.gen_bar_rect.y,
+                progress_w,
+                self.gen_bar_rect.h
+            )
+            pygame.draw.rect(surface, config.COLOR_BUTTON_ACTIVE, prog_rect)
+
         # Draw green solve tick marks on generation timeline bar
         if gen_history:
-            for g_idx, g_data in enumerate(gen_history):
-                c_frames_list = g_data.get("candidate_frames", [])
-                solved_gen: bool = any(
-                    len(cf) > 0 and cf[-1].get("reached_exit", False)
-                    for cf in c_frames_list
-                )
-                if solved_gen:
-                    g_r: float = float(g_idx) / float(
-                        max(1, total_gens - 1)
-                    )
+            for g_idx in range(min(len(gen_history), latest_gen + 1)):
+                g_data = gen_history[g_idx]
+                if g_data.get("solved", False):
+                    g_r: float = float(g_idx) / float(tot_g)
                     gx: int = int(
                         self.gen_bar_rect.x + (g_r * self.gen_bar_rect.w)
                     )
@@ -137,13 +145,12 @@ class TimelineScrubber:
                         2
                     )
 
-        # Draw green finish tick mark on frame bar for selected candidate
+        # Draw green finish tick mark on frame bar for selected run
         if selected_cand_frames:
+            tot_f: int = max(1, total_frames - 1)
             for f_step, f_dict in enumerate(selected_cand_frames):
                 if f_dict.get("reached_exit", False):
-                    f_r: float = float(f_step) / float(
-                        max(1, total_frames - 1)
-                    )
+                    f_r: float = float(f_step) / float(tot_f)
                     fx: int = int(
                         self.frame_bar_rect.x + (f_r * self.frame_bar_rect.w)
                     )
@@ -178,9 +185,7 @@ class TimelineScrubber:
         surface.blit(f_lbl, (f_marker_x - 12, self.frame_bar_rect.y - 14))
 
         # Generation Timeline Marker
-        g_ratio: float = (
-            float(active_gen) / float(max(1, total_gens - 1))
-        )
+        g_ratio: float = float(active_gen) / float(tot_g)
         g_marker_x: int = int(
             self.gen_bar_rect.x + (g_ratio * self.gen_bar_rect.w)
         )
@@ -192,13 +197,14 @@ class TimelineScrubber:
         )
 
         g_lbl = self.font.render(
-            f"# {active_gen + 1}", True, config.COLOR_MARKER
+            f"# {active_gen + 1}/{latest_gen + 1}", True, config.COLOR_MARKER
         )
         surface.blit(g_lbl, (g_marker_x - 12, self.gen_bar_rect.y + 18))
 
     def handle_click(
         self,
         click_pos: Tuple[int, int],
+        latest_gen: int,
         total_gens: int,
         total_frames: int,
         mouse_button: int = 1
@@ -238,6 +244,7 @@ class TimelineScrubber:
         if self.gen_bar_rect.collidepoint(cx, cy):
             rel_x = float(cx - self.gen_bar_rect.x)
             ratio = max(0.0, min(1.0, rel_x / float(self.gen_bar_rect.w)))
-            new_gen = int(round(ratio * (total_gens - 1)))
+            raw_gen: int = int(round(ratio * (total_gens - 1)))
+            new_gen = min(raw_gen, latest_gen)
 
         return new_gen, new_frame

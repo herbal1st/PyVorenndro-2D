@@ -1,5 +1,5 @@
 ```text
-. ____           __  __                                          __                 
+ ____           __  __                                          __                 
 /\  _`\        /\ \/\ \                                        /\ \                
 \ \ \L\ \__  __\ \ \ \ \    ___   _ __    __    ___     ___    \_\ \  _ __   ___   
  \ \ ,__/\ \/\ \\ \ \ \ \  / __`\/\`'__\/'__`\/' _ `\ /' _ `\  /'_` \/\`'__\/ __`\ 
@@ -15,19 +15,20 @@
 [1.0 SYSTEM OVERVIEW]
 -------------------------------------------------------------------------------
 Core Philosophy: Sovereign Compute, Matrix-Isolated, Zero-Dependency.
-Architecture   : High-performance 2D Neuroevolution Visualizer powered by a
-                 vectorized batch simulation engine, single-agent champion
-                 evolutionary strategy, data-driven YAML profiles, persistent
-                 compressed weight storage, PyBiwis 64-bit bitmask grid
-                 compression, grid-aligned Amanatides-Woo DDA raycasting,
-                 continuous Circle-to-AABB smooth wall physics, dual steering
-                 dynamics (Car and Tank profiles), adaptive curriculum
-                 training, hardware auto-tuning, and low-priority process
-                 scheduling.
-Primary Goal   : Train autonomous 2D candidate agents to navigate procedural
+Architecture   : High-performance 2D Neuroevolution Engine built with pure
+                 Python, NumPy, Pygame, and optional PyTorch CUDA support.
+                 Features a Single-Agent Champion evolutionary strategy,
+                 data-driven YAML profiles, persistent champion weights,
+                 PyBiwis 64-bit bitmask grid compression, vectorized DDA
+                 raycasting, continuous Circle-to-AABB smooth wall physics,
+                 dual kinematics steering profiles (Car and Tank), adaptive
+                 curriculum training, hardware auto-tuning, and low-priority
+                 process scheduling.
+Primary Goal   : Train autonomous candidate agents to navigate procedural
                  labyrinths from randomized start locations to exit tiles
-                 using a multi-ray visual sensor fan, target compass guidance,
-                 and topological distance feedback.
+                 using multi-ray visual probe fans, target compass guidance,
+                 topological distance gradients, and real-time damage
+                 indicator feedback channels.
 Presentation   : Interactive GUI featuring dual camera tracking modes (Map-
                  Centered and Player-Centered), 16x turbo speed controls,
                  dual-bar scrubber transport, pre-rendered background surface
@@ -35,41 +36,38 @@ Presentation   : Interactive GUI featuring dual camera tracking modes (Map-
                  neural activation graphs, and an 8-column CLI console table.
 
 
-[2.0 SINGLE-AGENT CHAMPION PARADIGM & MAZE EVALUATION]
+[2.0 SINGLE-AGENT CHAMPION PARADIGM & MAZE GENERALIZATION]
 -------------------------------------------------------------------------------
-Single Champion: Instead of evaluating a pool of distinct agents on a single
-                 maze layout, the system maintains a single Champion Agent.
-                 In every generation, the trainer evaluates the champion and
-                 its mutated offspring across dozens or thousands of parallel,
-                 independently-seeded procedural mazes simultaneously.
-Generalization : An agent cannot "cheat" or overfit to a single maze layout.
-                 Its score is the average performance across many procedural
-                 labyrinths, forcing true generalizable navigation logic to
-                 emerge.
+Single Champion: Rather than training a large pool of distinct agents on a
+                 single maze, the system maintains one master Champion Agent.
+                 In each generation, the trainer evaluates the champion and
+                 a set of mutated offspring across multiple independently-
+                 seeded procedural mazes simultaneously (paired evaluation).
+Generalization : An agent cannot memorize or "cheat" on a single maze layout.
+                 Its fitness score is the average performance across all
+                 evaluated mazes, encouraging true spatial navigation logic.
 Grid Storage   : Rectangular tile grids (MAP_WIDTH x MAP_HEIGHT) stored in
                  C-contiguous NumPy arrays for instant vectorized lookups.
 PyBiwis Chunks : Packed 64-bit integer words storing wall collision layouts,
                  compressing tile maps into tiny save snapshots.
 100% Floor Fill: All level generators use flood-fill analysis to guarantee
                  100% floor connectivity with zero isolated dead-end pockets.
-BFS Distance   : Every level builds an O(1) step-distance matrix. Each tile
-                 stores its exact topological step-distance to the exit.
+BFS Distance   : Every level builds an O(1) step-distance matrix where each
+                 tile stores its exact topological distance to the exit.
 Branching Walls: Organic tree-like maze crawler growing continuous wall
                  stems, 90-degree corners, and T-junctions without 2x2 solid
                  blocks or isolated dead zones.
 
 
-[3.0 DATA-DRIVEN PROFILE REGISTRY & PERSISTENCE (BRAIN LIBRARY)]
+[3.0 DATA-DRIVEN PROFILE REGISTRY & WEIGHT PERSISTENCE]
 -------------------------------------------------------------------------------
-Brain Library  : All agent parameters (sensory channels, neural topology,
-                 kinematics, metabolics, anti-spin guards, and file paths) are
-                 defined in 'brain_library.yaml', keeping code separate from
-                 configuration data.
+Brain Library  : Agent configurations (sensory channels, neural layer sizes,
+                 kinematics, health metabolics, anti-spin guards, and file
+                 paths) are defined in 'brain_library.yaml', keeping system
+                 code separate from agent data.
 Profiles       : Includes pre-configured profiles for 'scooterking38' (9 rays,
-                 120° arc, 32 neurons/layer) and 'herbal1st' (19 rays, 180° arc,
-                 compass enabled, 15 neurons/layer).
-Inheritance    : Profiles support parent-child parameter inheritance using the
-                 'extends' key for clean profile variations.
+                 120° arc, 32 neurons/layer) and 'herbal1st' (21 rays, 200° arc,
+                 3 hidden layers x 20 neurons).
 Fail-Fast Check: The engine validates profile schemas at boot. Missing or
                  misspelled YAML keys trigger immediate, clear errors rather
                  than running on hidden default fallback settings.
@@ -81,29 +79,35 @@ Persistence    : Champion weight and bias arrays auto-save to compressed
 
 [4.0 SPATIAL PERCEPTION & SENSORY CHANNELS]
 -------------------------------------------------------------------------------
-Vision Fan     : Configurable probe rays (e.g. 9 to 19 rays) distributed
-                 evenly across a configurable Field of View (e.g. 120° to 180°),
+Vision Fan     : Configurable probe rays (e.g. 9 to 21 rays) distributed
+                 evenly across a configurable Field of View (e.g. 120° to 200°),
                  calculated via grid-aligned Amanatides-Woo DDA. Measures
                  proximity to walls (0.0 for open space to 1.0 for point-blank
                  wall collision).
 Proprioception : 2 physical status channels:
                  - Speed Channel (SPD): Current forward translation speed.
                  - Health Channel (HP): Active candidate health ratio [0, 1].
+Damage Inputs  : 3 dedicated penalty indicator channels:
+                 - Collision Flag (HIT): 1.0 on wall impact (0.0 otherwise).
+                 - Idle Flag (IDL): 1.0 when stationary or turning in place.
+                 - Spin Flag (SPN): 1.0 when over the cumulative turn limit.
 Optional Compass: Toggleable via 'include_compass' in profile YAML. Adds 2
                  stereo target-guidance channels (TG-L, TG-R) encoding exit
                  bearing relative to agent heading.
 Optional BFS    : Toggleable via 'include_bfs_sensor' in profile YAML. Adds a
                  normalized topological goal-gradient sensor (distance to
                  exit / max maze span).
+Range & LOS    : Supports 'goal_sensor_max_range' for smooth distance falloff
+                 and 'enable_los_gating' for line-of-sight raycast checks.
 
 
 [5.0 NEURAL NETWORK ARCHITECTURE & FORWARD PASS]
 -------------------------------------------------------------------------------
-Inputs         : Dynamic sensory vector compiled per profile (e.g. 11, 13,
-                 or 23 continuous channels).
-Batched Pass   : Tensorized matrix multiplication ('np.einsum' or PyTorch
-                 tensors) evaluating the entire population's neural decisions
-                 simultaneously across all parallel runs.
+Inputs         : Dynamic sensory vector compiled per profile (e.g. 14, 16,
+                 or 26 continuous channels).
+Batched Pass   : Vectorized matrix multiplication ('np.einsum' on CPU or
+                 PyTorch CUDA tensors on GPU) evaluating all candidates and
+                 parallel mazes simultaneously in unified tensor batches.
 Hidden Layers  : Configurable multi-layer dense stack ('hidden_layers',
                  'neurons_per_layer') using ReLU activations and Xavier
                  weight initialization.
@@ -114,7 +118,7 @@ Outputs (Fixed): 2 continuous motor control channels:
 
 [6.0 KINEMATICS, HEALTH & DUAL STEERING PROFILES]
 -------------------------------------------------------------------------------
-Steering        : Selectable via 'profile_style' in brain_library.yaml:
+Steering       : Selectable via 'profile_style' in brain_library.yaml:
                  - "CAR": Turning rotation is scaled by forward velocity.
                    Standing still prevents turning, forcing driving arcs.
                  - "TANK": In-place differential steering. Turning while
@@ -128,48 +132,52 @@ Health & Damage : Candidates start at 100% health. Health drains from:
                   - Idle Penalty ('idle_damage').
                   - Cumulative Spin Penalty ('spin_damage_per_frame'):
                     Triggers once absolute turn accumulation exceeds
-                    'spin_angle_threshold_deg' without BFS progress.
+                    'spin_angle_threshold_deg' without driving straight for
+                    'spin_reset_hold_frames' consecutive frames.
                   - Stagnation Penalty ('stagnation_damage_per_frame'):
                     Triggers once an agent fails to set a new record BFS
                     distance within consecutive steps.
 BFS Recovery    : Setting a NEW best record for closeness to the exit
-                  restores health based on distance closed and resets both
-                  the cumulative spin counter and the stagnation clock.
+                  restores health based on distance closed and resets the
+                  cumulative spin counter, straight hold timer, and
+                  stagnation clock.
 Expressive UI   : Facial ASCII states map directly to physics events:
-                  - FACE_WALK : Normal walking traversal.
-                  - FACE_WALL : Active wall impact collision.
-                  - FACE_DEAD : Expired / zero health state.
-                  - FACE_EXIT : Successfully reached exit tile.
+                  - FACE_WALK : Normal walking traversal ("o_o").
+                  - FACE_WALL : Active wall impact collision (">*<").
+                  - FACE_DEAD : Expired / zero health state ("T_T").
+                  - FACE_EXIT : Successfully reached exit tile ("^*^").
 
 
-[7.0 DUAL TRAINING BACKENDS (CPU NUMPY & GPU PYTORCH)]
+[7.0 DUAL COMPUTE BACKENDS (CPU NUMPY & GPU PYTORCH)]
 -------------------------------------------------------------------------------
-CPU Backend    : Multi-core NumPy batch engine running parallel simulation
-                 chunks across worker processes using vectorized array math.
-GPU Backend    : PyTorch CUDA engine ('GpuHeadlessTrainer') evaluating up to
-                 65,536 parallel maze simulations simultaneously as batched
+CPU Backend    : Multi-candidate vectorized NumPy batch engine executing
+                 all candidates and mazes in unified tensor operations,
+                 delivering fast generation times (~0.2s - 0.5s per gen).
+GPU Backend    : PyTorch CUDA engine ('GpuHeadlessTrainer') evaluating thousands
+                 of parallel maze simulations simultaneously as batched CUDA
                  tensors in GPU VRAM, paired with an asynchronous multi-core
                  CPU map prefetching pool.
 Auto Fallback  : If PyTorch or CUDA hardware is unavailable, the trainer
-                 automatically reverts to the CPU NumPy engine.
+                 automatically reverts to the optimized CPU NumPy engine.
 
 
-[8.0 HARDWARE AUTO-TUNING & LOW-PRIORITY PROCESS SCHEDULING]
+[8.0 HARDWARE AUTO-TUNING & PROCESS SCHEDULING]
 -------------------------------------------------------------------------------
 Auto-Tuning    : At startup, the system benchmarks hardware throughput during
-                 a calibration probe run, automatically adjusting parallel run
-                 budgets to hit a target generation duration (e.g. 0.75s).
+                 a calibration probe run, automatically adjusting candidate
+                 population and maze count to hit a target generation
+                 duration (e.g. 0.75s).
 Core Capping   : Auto mode caps CPU workers at physical cores minus 1
                  ('max(1, (logical_cores // 2) - 1)'). On an 8-core / 16-thread
                  chip, workers cap at 3 or 4 processes, preventing 100% CPU
                  thread saturation and thermal throttling.
-Low Priority   : Worker processes lower their OS scheduling priority
+Low Priority   : Worker processes drop OS scheduling priority
                  ('BELOW_NORMAL_PRIORITY_CLASS' on Windows or 'os.nice(10)' on
                  Unix/macOS), ensuring desktop UI, browser, and display loops
                  always receive priority execution cycles.
 
 
-[9.0 VISUALIZER INTERFACE, TIMELINE HUD & GHOST REPLAYS]
+[9.0 VISUALIZER INTERFACE & INTERACTIVE GUI]
 -------------------------------------------------------------------------------
 Process Split  : The headless trainer runs inside a background worker process,
                  publishing champion weights to shared memory. The display
@@ -190,7 +198,8 @@ Telemetry HUD  : Overlay panel displaying active run step count, generation,
                  top scores, average scores, and winner callouts.
 Activation Graph: Real-time neural activation graph rendering node layer
                  intensities with dark-red-to-orange color shifts and input
-                 channel shorthand labels (-60°..+60°, TG-L, TG-R, SPD, HP).
+                 channel shorthand labels (-60°..+60°, TG-L, TG-R, SPD, HP,
+                 HIT, IDL, SPN).
 
 
 [10.0 CLI PROGRESS TABLE]
@@ -198,7 +207,7 @@ Activation Graph: Real-time neural activation graph rendering node layer
 CLI Layout     : Right-aligned 8-column real-time console table tracking
                  per-generation simulation progress during training:
                  - GEN   : Active evolutionary generation number (1-based).
-                 - BEST  : Scaled top-candidate score [0, 1000].
+                 - BEST  : Current generation's top candidate score [0, 1000].
                  - FIT   : Average scaled population score [0.0, 1000.0].
                  - WAY   : Average initial BFS step-distance to exit.
                  - FRAME : Step tick count of fastest exit solver (- if none).
@@ -218,6 +227,9 @@ Launch         : python main.py
 GUI Controls   : 
                  - ENTER         : Toggle camera (Map-Centered / Player-Centered).
                  - ESC           : Close visualizer GUI and terminate trainer.
+                 - SPACE         : Toggle Play/Pause transport.
+                 - LEFT / RIGHT  : Jump 25 frame steps backward/forward.
+                 - PAGEUP / DOWN : Jump 1 generation backward/forward.
                  - Left-Click    : Toggle camera zoom or scrub timeline.
                  - Right-Click   : Decrease playback speed on speed button.
 
