@@ -9,16 +9,16 @@ import math
 import os
 import random
 from concurrent.futures import ProcessPoolExecutor
-from typing import List, Dict, Any, Tuple, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
 import config
 from entities.player_state import PlayerState
 from training.agent import Agent
+from training.base_trainer import BaseTrainer
 from training.fitness import FitnessEvaluator
 from training.map_gen_worker import _generate_run_map_worker
-from training.trainer import HeadlessTrainer, _initialize_worker_priority
 
 try:
     import torch
@@ -1066,7 +1066,7 @@ def _build_states(
     return states
 
 
-class GpuHeadlessTrainer(HeadlessTrainer):
+class GpuHeadlessTrainer(BaseTrainer):
     """GPU single-agent trainer running batched CUDA tensor jobs."""
 
     def __init__(

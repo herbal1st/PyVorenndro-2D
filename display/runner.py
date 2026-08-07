@@ -6,7 +6,6 @@ TrainerBridge, input event dispatching via DisplayEventHandler, and UI drawing.
 """
 
 from pathlib import Path
-import random
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -15,7 +14,7 @@ import pygame
 import config
 from core.map_data import MapData
 from core.map_generator import MapGenerator
-from core.pathfinder import BFSPathfinder
+from core.map_pipeline import DisplayMapFactory
 from display.episode import Episode
 from display.event_handler import DisplayEventHandler, EventResult
 from display.network_graph import NetworkGraph
@@ -27,7 +26,7 @@ from display.viewport import Viewport
 
 class DisplayRunner:
     """
-    Orchestrates the Pygame window, input dispatching, and champion replay.
+    Orchestrates Pygame window, input dispatching, and champion replay.
     """
 
     def __init__(
@@ -36,12 +35,17 @@ class DisplayRunner:
         stop_event: Any = None
     ) -> None:
         """
-        Initializes IPC bridge, event listener, generators, and state flags.
+        Initializes IPC bridge, event listener, map factory, and state flags.
         """
         self._stop_event: Any = stop_event
         self.bridge: TrainerBridge = TrainerBridge(state)
         self.event_handler: DisplayEventHandler = DisplayEventHandler()
         self.map_generator: MapGenerator = MapGenerator()
+        self.display_map_factory: DisplayMapFactory = DisplayMapFactory(
+            map_generator=self.map_generator,
+            transformer=self.bridge.transformer,
+            profile_config=self.bridge.profile_config
+        )
 
         self.viewport: Optional[Viewport] = None
         self.panel: Optional[OverlayPanel] = None
@@ -87,8 +91,14 @@ class DisplayRunner:
                 break
 
             profile_changed: bool = self.bridge.refresh_metrics()
-            if profile_changed and self.viewport is not None:
-                self.viewport.set_profile_config(self.bridge.profile_config)
+            if profile_changed:
+                if self.viewport is not None:
+                    self.viewport.set_profile_config(
+                        self.bridge.profile_config
+                    )
+                self.display_map_factory.set_profile_config(
+                    self.bridge.profile_config
+                )
 
             latest_gen: int = int(self.bridge.metrics.get("generation", 0))
 
@@ -228,35 +238,9 @@ class DisplayRunner:
 
     def _make_run_map(self) -> Tuple[MapData, np.ndarray, int, float]:
         """
-        Builds a fresh randomly-seeded maze for the next display run.
+        Delegates single control-check display map creation to factory.
         """
-        if config.MAP_DIFFICULTY_MIN >= config.MAP_DIFFICULTY_MAX:
-            difficulty: float = config.MAP_DIFFICULTY_MIN
-        else:
-            difficulty = random.uniform(
-                config.MAP_DIFFICULTY_MIN, config.MAP_DIFFICULTY_MAX
-            )
-
-        map_data: MapData = self.map_generator.generate_solvable_map(
-            difficulty_ratio=difficulty
-        )
-
-        pathfinder: BFSPathfinder = BFSPathfinder(map_data)
-        pathfinder.compute_distance_matrix()
-
-        initial_bfs: int = pathfinder.get_step_distance(
-            *map_data.start_pos
-        )
-        dist_grid: np.ndarray = np.asarray(
-            pathfinder.distance_matrix, dtype=np.int64
-        )
-        spawn_heading: float = (
-            self.bridge.transformer.generate_random_heading(
-                map_data, map_data.start_pos
-            )
-        )
-
-        return map_data, dist_grid, initial_bfs, spawn_heading
+        return self.display_map_factory.create_display_map()
 
     def _start_episode(
         self,
@@ -288,7 +272,7 @@ class DisplayRunner:
 
     def _draw_splash(self, screen: pygame.Surface) -> None:
         """
-        Renders the waiting screen before the first model state arrives.
+        Renders waiting screen before first model state arrives.
         """
         screen.fill(config.COLOR_BG)
         font: pygame.font.Font = pygame.font.SysFont(

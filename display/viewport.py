@@ -3,7 +3,7 @@ Renders candidate viewport grid and single candidate zoom view.
 """
 
 import math
-from typing import Tuple, Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import pygame
 
 import config
@@ -30,7 +30,7 @@ class Viewport:
         self.rows: int = max(1, min(8, rows))
         self.cols: int = max(1, min(8, cols))
         self.selected_idx: int = 0
-        self.is_zoomed: bool = True  # True = Full Single View, False = Grid View
+        self.is_zoomed: bool = True
         self.is_player_centered: bool = False
         self.profile_config: Optional[Dict[str, Any]] = profile_config
         self.sampler: VisionArcSampler = VisionArcSampler(
@@ -45,7 +45,7 @@ class Viewport:
 
     def set_profile_config(self, profile_config: Dict[str, Any]) -> None:
         """
-        Updates the active profile configuration and sampler angles.
+        Updates active profile configuration and sampler angles.
         """
         self.profile_config = profile_config
         self.sampler = VisionArcSampler(profile_config=profile_config)
@@ -72,8 +72,8 @@ class Viewport:
         """
         cx, cy = click_pos
         if not (
-            self.x <= cx <= self.x + self.w and
-            self.y <= cy <= self.y + self.h
+            self.x <= cx <= self.x + self.w
+            and self.y <= cy <= self.y + self.h
         ):
             return False
 
@@ -172,9 +172,9 @@ class Viewport:
         rh: int
     ) -> pygame.Surface:
         """
-        Retrieves cached pre-rendered map surface using unique map memory id.
+        Retrieves cached pre-rendered map surface using unique map_id.
         """
-        cache_key: Tuple[int, int, int] = (id(map_data), rw, rh)
+        cache_key: Tuple[int, int, int] = (map_data.map_id, rw, rh)
         if cache_key in self._map_cache:
             return self._map_cache[cache_key]
 
@@ -260,8 +260,9 @@ class Viewport:
         cand_idx: int = int(run_data.get("cand_idx", 0))
 
         if self.is_player_centered:
+            player_zoom: float = getattr(config, "PLAYER_CAMERA_ZOOM", 1.5)
             tile_size: float = (
-                config.TILE_SIZE * config.PLAYER_CAMERA_ZOOM * ui_scale
+                config.TILE_SIZE * player_zoom * ui_scale
             )
             center_px: float = float(rx) + (float(rw) / 2.0)
             center_py: float = float(ry) + (float(rh) / 2.0)
@@ -385,7 +386,6 @@ class Viewport:
         f_rect = scaled_face.get_rect(center=(px, py))
         surface.blit(scaled_face, f_rect)
 
-        # Print top-left header as GEN #{gen_num} | AGENT #{cand_idx}
         idx_surf = font_norm.render(
             f"GEN #{gen_num} | AGENT #{cand_idx}",
             True,
