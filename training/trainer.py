@@ -8,6 +8,7 @@ NumPy batch matrix pass across all candidates and runs simultaneously.
 from collections import deque
 import math
 import os
+import pickle
 import random
 import sys
 import time
@@ -198,7 +199,7 @@ class HeadlessTrainer:
 
     def publish_state(self) -> None:
         """
-        Publishes champion genome and telemetry into shared memory.
+        Publishes champion genome and telemetry into shared memory as bytes.
         """
         if self._state is None:
             return
@@ -209,8 +210,8 @@ class HeadlessTrainer:
         self._state["input_size"] = int(self.input_size)
         self._state["output_size"] = int(self.output_size)
         self._state["layer_sizes"] = list(self.agent.sizes)
-        self._state["weights"] = weights
-        self._state["biases"] = biases
+        self._state["weights"] = pickle.dumps(weights)
+        self._state["biases"] = pickle.dumps(biases)
         self._state["generation"] = int(self._current_gen)
         self._state["num_generations"] = int(config.LEARNING_GENERATIONS)
         self._state["num_runs"] = int(self.shared_runs)
@@ -219,7 +220,7 @@ class HeadlessTrainer:
         self._state["gen_fitness"] = float(self.gen_fitness)
         self._state["solve_count"] = int(self.solve_count)
         self._state["training_complete"] = bool(self.training_complete)
-        self._state["gen_history"] = list(
+        self._state["gen_history"] = pickle.dumps(
             self.recorder.generations_history
         )
         self._state["initialized"] = True

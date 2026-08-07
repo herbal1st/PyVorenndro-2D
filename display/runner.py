@@ -9,6 +9,7 @@ parameters at human speed.
 import random
 import time
 import math
+import pickle
 from typing import Dict, Any, List, Optional, Tuple
 
 import numpy as np
@@ -70,7 +71,7 @@ class Episode:
         self.frames: List[Dict[str, Any]] = []
         self.finished: bool = False
         self.solved: bool = False
-        self.finish_step: int = 0
+        self.finish_step: int = max_steps
         self._celebration_count: int = 0
 
         self._kinematics: CandidateKinematics = CandidateKinematics(
@@ -147,7 +148,8 @@ class Episode:
             "initial_bfs": self.initial_bfs,
             "max_steps": self.max_steps,
             "finished": self.finished,
-            "solved": self.solved
+            "solved": self.solved,
+            "finish_step": self.finish_step
         }
 
     def simulate_up_to(self, target_step: int) -> None:
@@ -475,26 +477,34 @@ class DisplayRunner:
                     self._state.get("num_runs", 1)
                 ),
             }
-            self.gen_history = list(
-                self._state.get("gen_history", [])
-            )
+            raw_history = self._state.get("gen_history")
+            if raw_history:
+                try:
+                    self.gen_history = list(pickle.loads(raw_history))
+                except Exception:
+                    pass
 
     def _fetch_genome(
         self
     ) -> Optional[Tuple[List[np.ndarray], List[np.ndarray]]]:
         """
-        Asks the trainer for the latest champion model state.
+        Asks trainer for champion model state & unpickles bytes to arrays.
         """
         if not self._state.get("initialized"):
             return None
 
-        weights = self._state.get("weights")
-        biases = self._state.get("biases")
+        raw_weights = self._state.get("weights")
+        raw_biases = self._state.get("biases")
 
-        if weights is None or biases is None:
+        if raw_weights is None or raw_biases is None:
             return None
 
-        return weights, biases
+        try:
+            weights: List[np.ndarray] = pickle.loads(raw_weights)
+            biases: List[np.ndarray] = pickle.loads(raw_biases)
+            return weights, biases
+        except Exception:
+            return None
 
     def _make_run_map(self) -> Tuple[MapData, np.ndarray, int, float]:
         """
@@ -686,23 +696,12 @@ class DisplayRunner:
                     continue
 
             if self.scrubber.is_playing:
-                target: int = (
-                    self.active_frame + self.scrubber.playback_speed
-                )
-                self.episode.simulate_up_to(target)
+                self.active_frame += self.scrubber.playback_speed
+                max_clip_step: int = max(1, self.episode.finish_step)
+                self.active_frame = min(self.active_frame, max_clip_step)
 
-                if self.episode.finished:
-                    self.active_frame = self.episode.finish_step
-                else:
-                    self.active_frame = min(
-                        target,
-                        len(self.episode.frames)
-                    )
-
-                if (
-                    self.episode.finished
-                    and self.active_frame >= self.episode.finish_step
-                ):
+                # Clip reached end on screen - advance or replay
+                if self.active_frame >= max_clip_step:
                     if self.scrubber.repeat_all:
                         if self.active_gen < latest_gen:
                             self.active_gen += 1
