@@ -5,6 +5,7 @@ Tuned for maximum CPU execution speed with Numba JIT compilation.
 """
 
 from typing import Tuple
+import multiprocessing
 
 # ------ Display & Grid Layout ------
 SCREEN_WIDTH: int = 1280   # pixels
@@ -27,6 +28,16 @@ VISION_RAYS: int = 19   # 9 rays across 120° field of view
 VISION_ARC_ANGLE: float = 120.0   # degrees
 VISION_MAX_DIST: float = 6.0   # tiles
 INCLUDE_COMPASS: bool = False   # Pure visual raycasting navigation
+
+# ------ Fitness Reward Weights (Novelty / Exploration-Driven) ------
+FITNESS_WEIGHTS = {
+    "tile_discovery": 100.0,     # Strong reward for stepping onto uncharted floor tiles
+    "exit_completion": 2000.0,  # Massive flat reward for successfully finding the exit
+    "speed_efficiency": 2.0,    # Reward for finishing quickly once found
+    "health_penalty": 0.4,      # Health impact factor
+    "collision_penalty": 0.1,   # Very light wall penalty so they aren't afraid to move
+    "spin_penalty": 1.0,        # Discourages spinning in place
+}
 
 # ------ Kinematics & Health Tuning (REDUCED CULLING AGGRESSIVENESS) ------
 KINEMATICS_PROFILE: str = "CAR"   # style
@@ -54,7 +65,7 @@ NEURAL_NEURONS: int = 24   # Compact hidden layer for ultra-fast vector dot prod
 NEURAL_INPUT_SIZE: int = VISION_RAYS + 1  # 9 ray distances + 1 global target toggle indicator
 
 # ------ Genetic Algorithm & Training (BALANCED MUTATION & LARGER POOL) ------
-LEARNING_GENERATIONS: int = 350   # generations
+LEARNING_GENERATIONS: int = 150   # generations
 POPULATION_SIZE: int = 150   # Increased gene pool for better diversity and local minima escape
 MAX_SIMULATION_STEPS: int = 800   # Step cap
 MAP_REGIME_GENERATIONS: int = 25   # Keep the same map for 25 generations
@@ -72,8 +83,8 @@ SCRUBBER_PAGE_JUMP_GENS: int = 1   # generations
 DIST_TO_TIME_BONUS_RATIO: float = 1.2   # ratio
 LOST_HP_SCORE_IMPACT_RATIO: float = 0.6   # ratio
 
-# ------ Parallel Simulation ------
-SIMULATION_WORKERS: int = 4   # Parallel worker processes
+# ------ Parallel Simulation (Auto-detects all cores minus 1) ------
+SIMULATION_WORKERS: int = max(1, multiprocessing.cpu_count() - 1)
 
 # ------ Curriculum (Disabled per user instructions) ------
 CURRICULUM_ENABLED: bool = False
