@@ -1,5 +1,6 @@
 """
-Renders real-time neural network node activation graph with color shifts.
+Renders real-time neural network node activation graph with color shifts
+and updated input shorthand rendering for the global target toggle.
 """
 
 from typing import Tuple, List, Dict, Any
@@ -138,7 +139,7 @@ class NetworkGraph:
 
     def _get_input_shorthand(self, node_idx: int) -> str:
         """
-        Generates shorthand labels for Wall Rays, TG-L, TG-R, SPD, and HP inputs.
+        Generates shorthand labels for Vision Rays and the single Global Target flag.
         """
         num_rays: int = config.VISION_RAYS
         half_arc: float = config.VISION_ARC_ANGLE / 2.0
@@ -149,12 +150,6 @@ class NetworkGraph:
             return f"{deg:+d}°"
 
         elif node_idx == num_rays:
-            return "TG-L"
+            return "TRG"
 
-        elif node_idx == num_rays + 1:
-            return "TG-R"
-
-        elif node_idx == num_rays + 2:
-            return "SPD"
-
-        return "HP"
+        return ""

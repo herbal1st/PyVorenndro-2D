@@ -1,192 +1,98 @@
 """
-Spatial feature compiler and candidate spawn heading randomizer.
+Spatial transformer providing raycasting vision inputs using Numba JIT compilation.
 """
 
 import math
-import random
-from typing import Optional, Tuple
+from typing import Any, Tuple
 import numpy as np
 from numpy.typing import NDArray
+from numba import njit
 
 import config
-from core.map_data import MapData
-from perception.vision_arc import VisionArcSampler
+
+
+@njit(fastmath=True, nogil=True)
+def cast_ray_numba(
+    pos_x: float,
+    pos_y: float,
+    angle_rad: float,
+    max_dist: float,
+    wall_grid: NDArray[np.bool_],
+    grid_width: int,
+    grid_height: int
+) -> float:
+    """
+    Numba-compiled Digital Differential Analysis (DDA) raycasting kernel.
+    """
+    cos_a = math.cos(angle_rad)
+    sin_a = math.sin(angle_rad)
+
+    step_size = 0.05
+    dist = 0.0
+
+    while dist < max_dist:
+        check_x = int(math.floor(pos_x + cos_a * dist))
+        check_y = int(math.floor(pos_y + sin_a * dist))
+
+        if check_x < 0 or check_x >= grid_width or check_y < 0 or check_y >= grid_height:
+            return dist
+
+        if wall_grid[check_y, check_x]:
+            return dist
+
+        dist += step_size
+
+    return max_dist
 
 
 class SpatialTransformer:
     """
-    Compiles sensory observations into normalized flat neural vectors.
+    Processes agent spatial environment inputs into neural network features.
     """
 
     def __init__(self) -> None:
-        """
-        Initializes internal vision arc sampler.
-        """
-        self.sampler: VisionArcSampler = VisionArcSampler()
+        self.num_rays: int = config.VISION_RAYS
+        self.arc_angle_rad: float = math.radians(config.VISION_ARC_ANGLE)
+        self.max_dist: float = config.VISION_MAX_DIST
+        self.include_compass: bool = config.INCLUDE_COMPASS
 
-    @staticmethod
+        if self.num_rays > 1:
+            self.ray_angles = np.linspace(
+                -self.arc_angle_rad / 2.0,
+                self.arc_angle_rad / 2.0,
+                self.num_rays,
+                dtype=np.float64
+            )
+        else:
+            self.ray_angles = np.array([0.0], dtype=np.float64)
+
     def generate_random_heading(
-        map_data: Optional[MapData] = None,
-        start_pos: Optional[Tuple[int, int]] = None,
-        max_attempts: int = 50
+        self, map_data: Any = None, pos: Tuple[int, int] = None
     ) -> float:
         """
-        Returns heading angle in radians, avoiding immediate wall face.
+        Generates a uniform random spawn heading in radians [0, 2π).
         """
-        if map_data is None or start_pos is None:
-            return random.uniform(0.0, 2.0 * math.pi)
-
-        start_x, start_y = start_pos
-        center_x: float = float(start_x) + 0.5
-        center_y: float = float(start_y) + 0.5
-
-        for _ in range(max_attempts):
-            heading: float = random.uniform(0.0, 2.0 * math.pi)
-            probe_x: int = int(math.floor(center_x + math.cos(heading)))
-            probe_y: int = int(math.floor(center_y + math.sin(heading)))
-
-            if map_data.is_walkable(probe_x, probe_y):
-                return heading
-
-        return random.uniform(0.0, 2.0 * math.pi)
+        return float(np.random.uniform(0.0, 2.0 * math.pi))
 
     def compile_feature_vector(
         self,
-        candidate_x: float,
-        candidate_y: float,
-        heading_rad: float,
-        current_speed: float,
-        health_ratio: float,
-        map_data: MapData
-    ) -> NDArray[np.float32]:
-        """
-        Samples wall rays and target compass into 9 to 13 feature channels.
-        """
-        wall_channels: NDArray[np.float32] = (
-            self.sampler.sample_vision_channels(
-                candidate_x, candidate_y, heading_rad, map_data
-            )
-        )
-
-        tg_left, tg_right = self._compute_stereo_compass(
-            candidate_x, candidate_y, heading_rad, map_data.exit_pos
-        )
-
-        if config.INCLUDE_COMPASS:
-            state_features: NDArray[np.float32] = np.array(
-                [tg_left, tg_right, current_speed, health_ratio],
-                dtype=np.float32
-            )
-        else:
-            state_features = np.array(
-                [current_speed, health_ratio], dtype=np.float32
-            )
-
-        return np.concatenate([wall_channels, state_features])
-
-    def compile_feature_batch(
-        self,
-        xs: NDArray[np.float64],
-        ys: NDArray[np.float64],
-        headings: NDArray[np.float64],
-        speeds: NDArray[np.float64],
-        healths: NDArray[np.float64],
-        map_data: MapData,
-        wall_grid: Optional[NDArray[np.bool_]] = None
-    ) -> NDArray[np.float32]:
-        """
-        Vectorized feature compiler for (N,) candidate states.
-        Returns a (N, channels) float32 feature matrix.
-        """
-        wall_channels: NDArray[np.float32] = (
-            self.sampler.sample_vision_channels_batch(
-                xs, ys, headings, map_data, wall_grid
-            )
-        )
-
-        tg_left, tg_right = self._compute_stereo_compass_batch(
-            xs, ys, headings, map_data.exit_pos
-        )
-
-        if config.INCLUDE_COMPASS:
-            state_features: NDArray[np.float32] = np.stack(
-                [tg_left, tg_right, speeds, healths], axis=1
-            ).astype(np.float32)
-        else:
-            state_features = np.stack(
-                [speeds, healths], axis=1
-            ).astype(np.float32)
-
-        return np.concatenate([wall_channels, state_features], axis=1)
-
-    def _compute_stereo_compass(
-        self,
-        cx: float,
-        cy: float,
+        x: float,
+        y: float,
         heading: float,
-        exit_pos: Tuple[int, int]
-    ) -> Tuple[float, float]:
+        speed: float,
+        health: float,
+        wall_grid: NDArray[np.bool_]
+    ) -> NDArray[np.float64]:
         """
-        Computes TG-L and TG-R stereo binocular target compass channels.
+        Calculates ray distances and compiles sensor input features into a float array.
         """
-        ex: float = float(exit_pos[0]) + 0.5
-        ey: float = float(exit_pos[1]) + 0.5
+        grid_height, grid_width = wall_grid.shape
+        ray_distances = np.zeros(self.num_rays, dtype=np.float64)
 
-        dx: float = ex - cx
-        dy: float = ey - cy
+        for i in range(self.num_rays):
+            angle = heading + self.ray_angles[i]
+            d = cast_ray_numba(x, y, angle, self.max_dist, wall_grid, grid_width, grid_height)
+            ray_distances[i] = d / self.max_dist  # Normalized [0, 1]
 
-        target_angle: float = math.atan2(dy, dx)
-        angle_delta: float = (target_angle - heading) % (2.0 * math.pi)
-
-        if angle_delta > math.pi:
-            angle_delta -= 2.0 * math.pi
-
-        tg_left: float = 0.0
-        tg_right: float = 0.0
-
-        if -math.pi <= angle_delta <= 0.0:
-            tg_left = 1.0 - (abs(angle_delta) / math.pi)
-        if 0.0 <= angle_delta <= math.pi:
-            tg_right = 1.0 - (angle_delta / math.pi)
-
-        return max(0.0, min(1.0, tg_left)), max(0.0, min(1.0, tg_right))
-
-    def _compute_stereo_compass_batch(
-        self,
-        cxs: NDArray[np.float64],
-        cys: NDArray[np.float64],
-        headings: NDArray[np.float64],
-        exit_pos: Tuple[int, int]
-    ) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
-        """
-        Vectorized stereo binocular target compass for (N,) headings.
-        """
-        ex: float = float(exit_pos[0]) + 0.5
-        ey: float = float(exit_pos[1]) + 0.5
-
-        dx: NDArray[np.float64] = ex - cxs
-        dy: NDArray[np.float64] = ey - cys
-
-        target_angle: NDArray[np.float64] = np.arctan2(dy, dx)
-        angle_delta: NDArray[np.float64] = (
-            target_angle - headings
-        ) % (2.0 * math.pi)
-        angle_delta = np.where(
-            angle_delta > math.pi, angle_delta - 2.0 * math.pi, angle_delta
-        )
-
-        tg_left: NDArray[np.float64] = np.where(
-            (angle_delta >= -math.pi) & (angle_delta <= 0.0),
-            1.0 - (np.abs(angle_delta) / math.pi),
-            0.0,
-        )
-        tg_right: NDArray[np.float64] = np.where(
-            (angle_delta >= 0.0) & (angle_delta <= math.pi),
-            1.0 - (angle_delta / math.pi),
-            0.0,
-        )
-
-        return (
-            np.clip(tg_left, 0.0, 1.0),
-            np.clip(tg_right, 0.0, 1.0),
-        )
+        kinematics_features = np.array([speed, health], dtype=np.float64)
+        return np.concatenate((ray_distances, kinematics_features))

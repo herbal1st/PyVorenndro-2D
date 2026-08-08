@@ -1,176 +1,136 @@
 """
-Batched neural network population manager and neuroevolution engine.
+Population manager for CPU neuroevolution supporting Numba-accelerated inference
+and candidate weight extraction for multiprocessing/multithreading.
 """
 
-import random
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 import numpy as np
 from numpy.typing import NDArray
+from numba import njit
 
 import config
 
 
+@njit(fastmath=True, nogil=True)
+def numba_layer_forward(current_in: NDArray[np.float64], weight: NDArray[np.float64], bias: NDArray[np.float64]) -> NDArray[np.float64]:
+    """
+    Numba-compiled forward pass step: dot product, bias addition, and tanh activation.
+    """
+    return np.tanh(np.dot(current_in, weight) + bias)
+
+
 class PopulationManager:
     """
-    Owns batched MLP weight matrices and executes vectorized neuroevolution.
+    Manages neural network weights and evolutionary operations across the population.
     """
 
     def __init__(
         self,
-        pop_size: int = config.POPULATION_SIZE,
-        input_size: Optional[int] = None,
+        pop_size: int,
+        input_size: int,
+        output_size: int,
         hidden_layers: int = config.NEURAL_HIDDEN_LAYERS,
-        neurons: int = config.NEURAL_NEURONS,
-        output_size: int = 2,
-        mutation_rate: float = config.MUTATION_RATE,
-        mutation_scale: float = config.MUTATION_SCALE,
-        elitism_ratio: float = config.ELITISM_RATIO
+        neurons_per_hidden: int = config.NEURAL_NEURONS
     ) -> None:
-        """
-        Initializes evolution hyper-parameters and candidate weight stacks.
-        """
         self.pop_size: int = pop_size
-        self.mutation_rate: float = mutation_rate
-        self.mutation_scale: float = mutation_scale
-        self.elitism_ratio: float = elitism_ratio
-
-        if input_size is None:
-            compass_ch: int = 2 if config.INCLUDE_COMPASS else 0
-            input_size = config.VISION_RAYS + compass_ch + 2
-
         self.input_size: int = input_size
         self.output_size: int = output_size
-        self.layer_sizes: List[int] = [neurons] * hidden_layers
+        self.mutation_scale: float = config.MUTATION_SCALE
 
-        self.sizes: List[int] = (
-            [input_size] + self.layer_sizes + [output_size]
-        )
+        self.sizes: List[int] = [input_size]
+        for _ in range(hidden_layers):
+            self.sizes.append(neurons_per_hidden)
+        self.sizes.append(output_size)
+
         self.weights: List[NDArray[np.float64]] = []
         self.biases: List[NDArray[np.float64]] = []
-        self._init_weight_stacks()
 
-    def forward_batch(
-        self,
-        active_idx: List[int],
-        features: NDArray[np.float32]
-    ) -> Tuple[NDArray[np.float64], List[NDArray[np.float64]]]:
+        self._initialize_population()
+
+    def _initialize_population(self) -> None:
+        self.weights.clear()
+        self.biases.clear()
+
+        for i in range(len(self.sizes) - 1):
+            in_dim = self.sizes[i]
+            out_dim = self.sizes[i + 1]
+
+            limit = np.sqrt(6.0 / (in_dim + out_dim))
+            w_layer = np.random.uniform(
+                -limit, limit, size=(self.pop_size, in_dim, out_dim)
+            ).astype(np.float64)
+
+            b_layer = np.zeros((self.pop_size, out_dim), dtype=np.float64)
+
+            self.weights.append(w_layer)
+            self.biases.append(b_layer)
+
+    def get_candidate_weights(
+        self, candidate_idx: int
+    ) -> List[Tuple[NDArray[np.float64], NDArray[np.float64]]]:
         """
-        Executes batched forward pass over active candidates.
+        Extracts weight and bias matrices for a single candidate.
+        Exposes weights cleanly for parallel evaluation workers.
         """
-        idx: NDArray[np.int64] = np.asarray(active_idx, dtype=np.int64)
-        x: NDArray[np.float64] = features.astype(np.float64, copy=False)
+        candidate_layers = []
+        for l_idx in range(len(self.weights)):
+            w = self.weights[l_idx][candidate_idx].copy()
+            b = self.biases[l_idx][candidate_idx].copy()
+            candidate_layers.append((w, b))
+        return candidate_layers
 
-        acts: List[NDArray[np.float64]] = [x]
+    def evolve_next_generation(self, fitness_scores: List[float]) -> None:
+        scores = np.asarray(fitness_scores, dtype=np.float64)
+        sorted_indices = np.argsort(scores)[::-1]
 
-        for l_idx, (w, b) in enumerate(zip(self.weights, self.biases)):
-            x = np.einsum(
-                "ni,nij->nj", x, w[idx], optimize=False
-            ) + b[idx].squeeze(1)
-            acts.append(x)
-            if l_idx < len(self.layer_sizes):
-                x = np.maximum(0.0, x)
+        num_elites = max(1, int(self.pop_size * config.ELITISM_RATIO))
+        elite_indices = sorted_indices[:num_elites]
 
-        move_eff: NDArray[np.float64] = 1.0 / (
-            1.0 + np.exp(-np.clip(x[:, 0:1], -500.0, 500.0))
-        )
-        turn_eff: NDArray[np.float64] = np.tanh(x[:, 1:2])
-        outputs: NDArray[np.float64] = np.hstack([move_eff, turn_eff])
+        new_weights: List[NDArray[np.float64]] = [np.empty_like(w) for w in self.weights]
+        new_biases: List[NDArray[np.float64]] = [np.empty_like(b) for b in self.biases]
 
-        return outputs, acts
+        for l_idx in range(len(self.weights)):
+            new_weights[l_idx][:num_elites] = self.weights[l_idx][elite_indices]
+            new_biases[l_idx][:num_elites] = self.biases[l_idx][elite_indices]
 
-    def evolve_next_generation(
-        self,
-        fitness_scores: List[float]
-    ) -> None:
-        """
-        Performs elitism, tournament selection, crossover, and mutation.
-        """
-        indexed_scores: List[Tuple[int, float]] = list(
-            enumerate(fitness_scores)
-        )
-        indexed_scores.sort(key=lambda item: item[1], reverse=True)
+        num_offspring = self.pop_size - num_elites
+        if num_offspring > 0:
+            parent1_indices = self._tournament_selection(scores, num_offspring)
+            parent2_indices = self._tournament_selection(scores, num_offspring)
 
-        num_elites: int = max(1, int(self.pop_size * self.elitism_ratio))
-        elite_idx: List[int] = [
-            idx for idx, _ in indexed_scores[:num_elites]
-        ]
+            for l_idx in range(len(self.weights)):
+                mask_w = np.random.rand(*self.weights[l_idx][parent1_indices].shape) < 0.5
+                mask_b = np.random.rand(*self.biases[l_idx][parent1_indices].shape) < 0.5
 
-        n_offspring: int = self.pop_size - num_elites
-        parent_a: NDArray[np.int64] = self._tournament_select(
-            fitness_scores, n_offspring
-        )
-        parent_b: NDArray[np.int64] = self._tournament_select(
-            fitness_scores, n_offspring
-        )
+                child_w = np.where(
+                    mask_w,
+                    self.weights[l_idx][parent1_indices],
+                    self.weights[l_idx][parent2_indices]
+                )
+                child_b = np.where(
+                    mask_b,
+                    self.biases[l_idx][parent1_indices],
+                    self.biases[l_idx][parent2_indices]
+                )
 
-        new_weights: List[NDArray[np.float64]] = []
-        new_biases: List[NDArray[np.float64]] = []
+                mut_mask_w = np.random.rand(*child_w.shape) < config.MUTATION_RATE
+                mut_mask_b = np.random.rand(*child_b.shape) < config.MUTATION_RATE
 
-        for l_idx in range(len(self.sizes) - 1):
-            elite_w: NDArray[np.float64] = (
-                self.weights[l_idx][elite_idx].copy()
-            )
-            elite_b: NDArray[np.float64] = (
-                self.biases[l_idx][elite_idx].copy()
-            )
+                child_w += mut_mask_w * np.random.normal(0.0, self.mutation_scale, size=child_w.shape)
+                child_b += mut_mask_b * np.random.normal(0.0, self.mutation_scale, size=child_b.shape)
 
-            wa: NDArray[np.float64] = self.weights[l_idx][parent_a]
-            wb: NDArray[np.float64] = self.weights[l_idx][parent_b]
-            ba: NDArray[np.float64] = self.biases[l_idx][parent_a]
-            bb: NDArray[np.float64] = self.biases[l_idx][parent_b]
-
-            mask_w: NDArray[np.bool_] = np.random.rand(*wa.shape) < 0.5
-            mask_b: NDArray[np.bool_] = np.random.rand(*ba.shape) < 0.5
-            child_w: NDArray[np.float64] = np.where(mask_w, wa, wb)
-            child_b: NDArray[np.float64] = np.where(mask_b, ba, bb)
-
-            mut_mask: NDArray[np.bool_] = (
-                np.random.rand(n_offspring, 1, 1) < self.mutation_rate
-            )
-            noise_w: NDArray[np.float64] = np.random.normal(
-                0.0, self.mutation_scale, child_w.shape
-            )
-            noise_b: NDArray[np.float64] = np.random.normal(
-                0.0, self.mutation_scale, child_b.shape
-            )
-
-            child_w += noise_w * mut_mask
-            child_b += noise_b * mut_mask
-
-            new_weights.append(np.concatenate([elite_w, child_w], axis=0))
-            new_biases.append(np.concatenate([elite_b, child_b], axis=0))
+                new_weights[l_idx][num_elites:] = child_w
+                new_biases[l_idx][num_elites:] = child_b
 
         self.weights = new_weights
         self.biases = new_biases
 
-    def _init_weight_stacks(self) -> None:
-        """
-        Builds batched Gaussian-initialized weight and bias matrices.
-        """
-        for fin, fout in zip(self.sizes[:-1], self.sizes[1:]):
-            scale: float = np.sqrt(2.0 / float(fin + fout))
-            weights: NDArray[np.float64] = scale * np.random.randn(
-                self.pop_size, fin, fout
-            )
-            biases: NDArray[np.float64] = np.zeros(
-                (self.pop_size, 1, fout), dtype=np.float64
-            )
-            self.weights.append(weights)
-            self.biases.append(biases)
-
-    def _tournament_select(
-        self,
-        scores: List[float],
-        count: int,
-        k: int = 3
+    def _tournament_selection(
+        self, scores: NDArray[np.float64], num_selections: int, tournament_size: int = 3
     ) -> NDArray[np.int64]:
-        """
-        Returns (count,) parent indices from k-way tournament sampling.
-        """
-        k = min(k, self.pop_size)
-        picks: NDArray[np.int64] = np.array([
-            random.sample(range(self.pop_size), k) for _ in range(count)
-        ])
-        cand_scores: NDArray[np.float64] = np.asarray(scores)[picks]
-        best: NDArray[np.int64] = cand_scores.argmax(axis=1)
-        return picks[np.arange(count), best]
+        selected = np.empty(num_selections, dtype=np.int64)
+        for i in range(num_selections):
+            competitors = np.random.choice(self.pop_size, size=tournament_size, replace=False)
+            winner = competitors[np.argmax(scores[competitors])]
+            selected[i] = winner
+        return selected
