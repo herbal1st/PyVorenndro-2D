@@ -1,12 +1,12 @@
 """
-Population manager for CPU neuroevolution supporting Numba-accelerated inference
-and candidate weight extraction for multiprocessing/multithreading.
+Population manager for CPU neuroevolution supporting Numba-accelerated parallel inference
+and candidate weight extraction for multithreading.
 """
 
 from typing import List, Tuple
 import numpy as np
 from numpy.typing import NDArray
-from numba import njit
+from numba import njit, prange
 
 import config
 
@@ -14,9 +14,31 @@ import config
 @njit(fastmath=True, nogil=True)
 def numba_layer_forward(current_in: NDArray[np.float64], weight: NDArray[np.float64], bias: NDArray[np.float64]) -> NDArray[np.float64]:
     """
-    Numba-compiled forward pass step: dot product, bias addition, and tanh activation.
+    Numba-compiled single forward pass step: dot product, bias addition, and tanh activation.
     """
     return np.tanh(np.dot(current_in, weight) + bias)
+
+
+@njit(fastmath=True, nogil=True, parallel=True)
+def numba_layer_forward_batch(
+    inputs: NDArray[np.float64],
+    weights: NDArray[np.float64],
+    biases: NDArray[np.float64]
+) -> NDArray[np.float64]:
+    """
+    Numba-compiled parallel batch forward pass across all population candidates.
+    Spreads the work across all available CPU cores using prange.
+    """
+    n_cands = inputs.shape[0]
+    out_dim = biases.shape[1]
+    result = np.empty((n_cands, out_dim), dtype=np.float64)
+
+    for i in prange(n_cands):
+        res = np.dot(inputs[i], weights[i]) + biases[i]
+        for j in range(out_dim):
+            result[i, j] = np.tanh(res[j])
+
+    return result
 
 
 class PopulationManager:

@@ -5,6 +5,7 @@ Tuned for maximum CPU execution speed with Numba JIT compilation.
 """
 
 from typing import Tuple
+import multiprocessing
 
 # ------ Display & Grid Layout ------
 SCREEN_WIDTH: int = 1280   # pixels
@@ -23,13 +24,23 @@ MAX_MAP_GEN_ATTEMPTS: int = 150   # attempts
 MIN_PATH_DIFFICULTY_RATIO: float = 0.40   # ratio
 
 # ------ Sensory & Vision Arc (NO COMPASS, NUMBA-OPTIMIZED) ------
-VISION_RAYS: int = 9   # 9 rays across 120° field of view
+VISION_RAYS: int = 19   # 9 rays across 120° field of view
 VISION_ARC_ANGLE: float = 120.0   # degrees
 VISION_MAX_DIST: float = 6.0   # tiles
 INCLUDE_COMPASS: bool = False   # Pure visual raycasting navigation
 
+# ------ Fitness Reward Weights (Novelty / Exploration-Driven) ------
+FITNESS_WEIGHTS = {
+    "tile_discovery": 100.0,     # Strong reward for stepping onto uncharted floor tiles
+    "exit_completion": 2000.0,  # Massive flat reward for successfully finding the exit
+    "speed_efficiency": 2.0,    # Reward for finishing quickly once found
+    "health_penalty": 0.4,      # Health impact factor
+    "collision_penalty": 0.1,   # Very light wall penalty so they aren't afraid to move
+    "spin_penalty": 1.0,        # Discourages spinning in place
+}
+
 # ------ Kinematics & Health Tuning (REDUCED CULLING AGGRESSIVENESS) ------
-KINEMATICS_PROFILE: str = "TANK"   # style
+KINEMATICS_PROFILE: str = "CAR"   # style
 MOVE_SPEED: float = 0.15   # tiles
 TURN_SPEED: float = 1800.0   # dpsec
 PLAYER_RADIUS_RATIO: float = 0.45   # ratio
@@ -50,30 +61,30 @@ STAGNATION_DMG_PER_FRAME: float = 0.010   # Balanced culling in dead ends
 
 # ------ Neural Architecture ------
 NEURAL_HIDDEN_LAYERS: int = 1   # layers
-NEURAL_NEURONS: int = 12   # Compact hidden layer for ultra-fast vector dot products
+NEURAL_NEURONS: int = 24   # Compact hidden layer for ultra-fast vector dot products
 NEURAL_INPUT_SIZE: int = VISION_RAYS + 1  # 9 ray distances + 1 global target toggle indicator
 
 # ------ Genetic Algorithm & Training (BALANCED MUTATION & LARGER POOL) ------
-LEARNING_GENERATIONS: int = 350   # generations
+LEARNING_GENERATIONS: int = 150   # generations
 POPULATION_SIZE: int = 150   # Increased gene pool for better diversity and local minima escape
 MAX_SIMULATION_STEPS: int = 800   # Step cap
-MAP_REGIME_GENERATIONS: int = 1   # Generates a new map every generation
-REGIME_MIN_GENERATIONS: int = 1   # generations
-REGIME_SOLVE_TARGET: int = 1   # solvers
+MAP_REGIME_GENERATIONS: int = 25   # Keep the same map for 25 generations
+REGIME_MIN_GENERATIONS: int = 15   # Force at least 15 generations on a map
+REGIME_SOLVE_TARGET: int = 5       # Allow early rotation only if 5 agents solve it
 REGIME_TRANSITION_MUTATION_BOOST: float = 1.0   # scale
-MAP_DIFFICULTY_MIN: float = 0.40   # ratio
-MAP_DIFFICULTY_MAX: float = 0.85   # ratio
+MAP_DIFFICULTY_MIN: float = 0.5
+MAP_DIFFICULTY_MAX: float = 0.5  # Lowered from 0.85 to avoid brutal layouts
 MUTATION_RATE: float = 0.08   # Slightly reduced to protect high-performing gene structures
 MUTATION_SCALE: float = 0.05   # Reduced to prevent catastrophic regression in top generations
-ELITISM_RATIO: float = 0.20   # Preserves top generalist visual controllers
+ELITISM_RATIO: float = 0.30   # Preserves top generalist visual controllers
 DEFAULT_PLAYBACK_SPEED: int = 1   # multiplier
 SCRUBBER_ARROW_JUMP_FRAMES: int = 25   # frames
 SCRUBBER_PAGE_JUMP_GENS: int = 1   # generations
 DIST_TO_TIME_BONUS_RATIO: float = 1.2   # ratio
 LOST_HP_SCORE_IMPACT_RATIO: float = 0.6   # ratio
 
-# ------ Parallel Simulation ------
-SIMULATION_WORKERS: int = 4   # Parallel worker processes
+# ------ Parallel Simulation (Auto-detects all cores minus 1) ------
+SIMULATION_WORKERS: int = max(1, multiprocessing.cpu_count() - 1)
 
 # ------ Curriculum (Disabled per user instructions) ------
 CURRICULUM_ENABLED: bool = False

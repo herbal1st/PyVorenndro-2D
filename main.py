@@ -1,8 +1,23 @@
 """
 Application entry point executing pre-training and launching visualizer GUI.
+Configured with cross-platform multi-core hardware scaling.
 """
 
 import sys
+import os
+import multiprocessing
+from numba import config as numba_config
+
+# --- HARDWARE CORE CONFIGURATION (Auto-use all cores minus 1 on any OS) ---
+AVAILABLE_CORES = max(1, multiprocessing.cpu_count() - 1)
+
+numba_config.NUMBA_NUM_THREADS = AVAILABLE_CORES
+os.environ["OMP_NUM_THREADS"] = str(AVAILABLE_CORES)
+os.environ["MKL_NUM_THREADS"] = str(AVAILABLE_CORES)
+os.environ["OPENBLAS_NUM_THREADS"] = str(AVAILABLE_CORES)
+os.environ["VECLIB_MAXIMUM_THREADS"] = str(AVAILABLE_CORES)
+os.environ["NUMEXPR_NUM_THREADS"] = str(AVAILABLE_CORES)
+
 import pygame
 
 import config
@@ -17,6 +32,8 @@ def main() -> None:
     """
     Runs headless neuroevolution, then initializes Pygame interactive GUI.
     """
+    print(f"[System] Initializing PyVorenndro 2D across {AVAILABLE_CORES} CPU core(s)...")
+
     # 1. Run Headless Training Loop & Pre-calculate Generations
     trainer = HeadlessTrainer()
     recorder = trainer.run_training_session()
@@ -27,7 +44,6 @@ def main() -> None:
         sys.exit(1)
 
     # 2. Initialize Pygame GUI Window
-        # 2. Initialize Pygame GUI Window
     pygame.init()
     pygame.key.set_repeat(300, 50)
     screen: pygame.Surface = pygame.display.set_mode(
@@ -195,6 +211,7 @@ def main() -> None:
         clock.tick(config.FPS)
 
     pygame.quit()
+
 
 if __name__ == "__main__":
     main()
