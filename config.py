@@ -23,13 +23,13 @@ MAX_MAP_GEN_ATTEMPTS: int = 150   # attempts
 MIN_PATH_DIFFICULTY_RATIO: float = 0.40   # ratio
 
 # ------ Sensory & Vision Arc (NO COMPASS, NUMBA-OPTIMIZED) ------
-VISION_RAYS: int = 9   # 9 rays across 120° field of view
+VISION_RAYS: int = 19   # 9 rays across 120° field of view
 VISION_ARC_ANGLE: float = 120.0   # degrees
 VISION_MAX_DIST: float = 6.0   # tiles
 INCLUDE_COMPASS: bool = False   # Pure visual raycasting navigation
 
 # ------ Kinematics & Health Tuning (REDUCED CULLING AGGRESSIVENESS) ------
-KINEMATICS_PROFILE: str = "TANK"   # style
+KINEMATICS_PROFILE: str = "CAR"   # style
 MOVE_SPEED: float = 0.15   # tiles
 TURN_SPEED: float = 1800.0   # dpsec
 PLAYER_RADIUS_RATIO: float = 0.45   # ratio
@@ -50,22 +50,22 @@ STAGNATION_DMG_PER_FRAME: float = 0.010   # Balanced culling in dead ends
 
 # ------ Neural Architecture ------
 NEURAL_HIDDEN_LAYERS: int = 1   # layers
-NEURAL_NEURONS: int = 12   # Compact hidden layer for ultra-fast vector dot products
+NEURAL_NEURONS: int = 24   # Compact hidden layer for ultra-fast vector dot products
 NEURAL_INPUT_SIZE: int = VISION_RAYS + 1  # 9 ray distances + 1 global target toggle indicator
 
 # ------ Genetic Algorithm & Training (BALANCED MUTATION & LARGER POOL) ------
 LEARNING_GENERATIONS: int = 350   # generations
 POPULATION_SIZE: int = 150   # Increased gene pool for better diversity and local minima escape
 MAX_SIMULATION_STEPS: int = 800   # Step cap
-MAP_REGIME_GENERATIONS: int = 1   # Generates a new map every generation
-REGIME_MIN_GENERATIONS: int = 1   # generations
-REGIME_SOLVE_TARGET: int = 1   # solvers
+MAP_REGIME_GENERATIONS: int = 25   # Keep the same map for 25 generations
+REGIME_MIN_GENERATIONS: int = 15   # Force at least 15 generations on a map
+REGIME_SOLVE_TARGET: int = 5       # Allow early rotation only if 5 agents solve it
 REGIME_TRANSITION_MUTATION_BOOST: float = 1.0   # scale
-MAP_DIFFICULTY_MIN: float = 0.40   # ratio
-MAP_DIFFICULTY_MAX: float = 0.85   # ratio
+MAP_DIFFICULTY_MIN: float = 0.5
+MAP_DIFFICULTY_MAX: float = 0.5  # Lowered from 0.85 to avoid brutal layouts
 MUTATION_RATE: float = 0.08   # Slightly reduced to protect high-performing gene structures
 MUTATION_SCALE: float = 0.05   # Reduced to prevent catastrophic regression in top generations
-ELITISM_RATIO: float = 0.20   # Preserves top generalist visual controllers
+ELITISM_RATIO: float = 0.30   # Preserves top generalist visual controllers
 DEFAULT_PLAYBACK_SPEED: int = 1   # multiplier
 SCRUBBER_ARROW_JUMP_FRAMES: int = 25   # frames
 SCRUBBER_PAGE_JUMP_GENS: int = 1   # generations
